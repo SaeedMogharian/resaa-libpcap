@@ -1,12 +1,3 @@
-/* ldev.c
-   Martin Casado
-   
-   To compile:
-   >gcc ldev.c -lpcap
-
-   Looks for an interface, and lists the network ip
-   and mask associated with that interface.
-*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <pcap.h>  /* GIMME a libpcap plz! */
@@ -17,60 +8,61 @@
 
 int main(int argc, char **argv)
 {
-  char *dev; /* name of the device to use */ 
-  char *net; /* dot notation of the network address */
-  char *mask;/* dot notation of the network mask    */
-  int ret;   /* return code */
-  char errbuf[PCAP_ERRBUF_SIZE];
-  bpf_u_int32 netp; /* ip          */
-  bpf_u_int32 maskp;/* subnet mask */
-  struct in_addr addr;
+    char *net; /* dot notation of the network address */
+    char *mask; /* dot notation of the network mask    */
+    int ret; /* return code */
+    char errbuf[PCAP_ERRBUF_SIZE];
+    bpf_u_int32 netp; /* ip */
+    bpf_u_int32 maskp; /* subnet mask */
+    struct in_addr addr;
+    pcap_if_t *alldevs, *d;
 
-  /* ask pcap to find a valid device for use to sniff on */
-  dev = pcap_lookupdev(errbuf);
+    /* find all devices */
+    if (pcap_findalldevs(&alldevs, errbuf) == -1) {
+        fprintf(stderr, "Error finding devices: %s\n", errbuf);
+        exit(1);
+    }
 
-  /* error checking */
-  if(dev == NULL)
-  {
-   printf("%s\n",errbuf);
-   exit(1);
-  }
+    /* select the first device */
+    d = alldevs;
+    if (d == NULL) {
+        fprintf(stderr, "No devices found\n");
+        pcap_freealldevs(alldevs);
+        exit(1);
+    }
 
-  /* print out device name */
-  printf("DEV: %s\n",dev);
+    printf("DEV: %s\n", d->name);
 
-  /* ask pcap for the network address and mask of the device */
-  ret = pcap_lookupnet(dev,&netp,&maskp,errbuf);
+    /* get the network address and mask */
+    ret = pcap_lookupnet(d->name, &netp, &maskp, errbuf);
+    if (ret == -1) {
+        printf("Error looking up network: %s\n", errbuf);
+        pcap_freealldevs(alldevs);
+        exit(1);
+    }
 
-  if(ret == -1)
-  {
-   printf("%s\n",errbuf);
-   exit(1);
-  }
+    /* convert and print network address */
+    addr.s_addr = netp;
+    net = inet_ntoa(addr);
+    if (net == NULL) {
+        perror("inet_ntoa");
+        pcap_freealldevs(alldevs);
+        exit(1);
+    }
+    printf("NET: %s\n", net);
 
-  /* get the network address in a human readable form */
-  addr.s_addr = netp;
-  net = inet_ntoa(addr);
+    /* convert and print subnet mask */
+    addr.s_addr = maskp;
+    mask = inet_ntoa(addr);
+    if (mask == NULL) {
+        perror("inet_ntoa");
+        pcap_freealldevs(alldevs);
+        exit(1);
+    }
+    printf("MASK: %s\n", mask);
 
-  if(net == NULL)/* thanks Scott :-P */
-  {
-    perror("inet_ntoa");
-    exit(1);
-  }
+    /* free the device list */
+    pcap_freealldevs(alldevs);
 
-  printf("NET: %s\n",net);
-
-  /* do the same as above for the device's mask */
-  addr.s_addr = maskp;
-  mask = inet_ntoa(addr);
-  
-  if(mask == NULL)
-  {
-    perror("inet_ntoa");
-    exit(1);
-  }
-  
-  printf("MASK: %s\n",mask);
-
-  return 0;
+    return 0;
 }
