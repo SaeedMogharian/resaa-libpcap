@@ -29,7 +29,7 @@ code: https://github.com/vichargrave/sniffer
 
 --> The code run good!!
 
---> Change the handle_pcap function to reach the desired function
+--> Change the `handle_pcap` function to reach the desired function
 
 # Using libpcap in C
 [https://www.devdungeon.com/content/using-libpcap-c](https://www.devdungeon.com/content/using-libpcap-c)
