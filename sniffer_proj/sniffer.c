@@ -27,13 +27,64 @@
 #include <unistd.h>
 #include <signal.h>
 #include <pcap/pcap.h>
+#include <arpa/inet.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
+#include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
+
+
+struct IpStats {
+    char ip[INET_ADDRSTRLEN];
+    int packets_received;
+    int packets_sent;
+    int bytes_received;
+    int bytes_sent;
+    struct IpStats* next;
+};
+
+// Map to store IP statistics
+// Head of the linked list
+struct IpStats* ip_statistics = NULL;
 
 pcap_t* handle;
 int linkhdrlen;
 int packets;
+
+
+// Function to find or add an IP in the statistics list
+struct IpStats* find_or_add_ip(const char* ip) {
+    struct IpStats* current = ip_statistics;
+    struct IpStats* prev = NULL;
+
+    // Search for the IP in the list
+    while (current != NULL) {
+        if (strcmp(current->ip, ip) == 0) {
+            return current;
+        }
+        prev = current;
+        current = current->next;
+    }
+
+    // IP not found; add a new node to the list
+    struct IpStats* new_entry = (struct IpStats*)malloc(sizeof(struct IpStats));
+    strcpy(new_entry->ip, ip);
+    new_entry->packets_received = 0;
+    new_entry->packets_sent = 0;
+    new_entry->bytes_received = 0;
+    new_entry->bytes_sent = 0;
+    new_entry->next = NULL;
+
+    // Add to the list
+    if (prev == NULL) {
+        ip_statistics = new_entry; // First element
+    } else {
+        prev->next = new_entry;
+    }
+
+    return new_entry;
+}
+
 
 pcap_t* create_pcap_handle(char* device, char* filter)
 {
@@ -113,79 +164,71 @@ void get_link_header_len(pcap_t* handle)
     }
 }
 
-void packet_handler(u_char *user, const struct pcap_pkthdr *packethdr, const u_char *packetptr)
-{
+void packet_handler(u_char *user, const struct pcap_pkthdr *packethdr, const u_char *packetptr) {
     struct ip* iphdr;
-    struct icmp* icmphdr;
-    struct tcphdr* tcphdr;
-    struct udphdr* udphdr;
-    char iphdrInfo[256];
-    char srcip[256];
-    char dstip[256];
- 
+    char srcip[INET_ADDRSTRLEN];
+    char dstip[INET_ADDRSTRLEN];
 
-    // Skip the datalink layer header and get the IP header fields.
+    // Skip the datalink layer header and get the IP header fields
     packetptr += linkhdrlen;
     iphdr = (struct ip*)packetptr;
-    strcpy(srcip, inet_ntoa(iphdr->ip_src));
-    strcpy(dstip, inet_ntoa(iphdr->ip_dst));
-    sprintf(iphdrInfo, "ID:%d TOS:0x%x, TTL:%d IpLen:%d DgLen:%d",
-            ntohs(iphdr->ip_id), iphdr->ip_tos, iphdr->ip_ttl,
-            4*iphdr->ip_hl, ntohs(iphdr->ip_len));
- 
-    // Advance to the transport layer header then parse and display
-    // the fields based on the type of hearder: tcp, udp or icmp.
-    packetptr += 4*iphdr->ip_hl;
-    switch (iphdr->ip_p)
-    {
-    case IPPROTO_TCP:
-        tcphdr = (struct tcphdr*)packetptr;
-        printf("TCP  %s:%d -> %s:%d\n", srcip, ntohs(tcphdr->th_sport),
-               dstip, ntohs(tcphdr->th_dport));
-        printf("%s\n", iphdrInfo);
-        printf("%c%c%c%c%c%c Seq: 0x%x Ack: 0x%x Win: 0x%x TcpLen: %d\n",
-               (tcphdr->th_flags & TH_URG ? 'U' : '*'),
-               (tcphdr->th_flags & TH_ACK ? 'A' : '*'),
-               (tcphdr->th_flags & TH_PUSH ? 'P' : '*'),
-               (tcphdr->th_flags & TH_RST ? 'R' : '*'),
-               (tcphdr->th_flags & TH_SYN ? 'S' : '*'),
-               (tcphdr->th_flags & TH_SYN ? 'F' : '*'),
-               ntohl(tcphdr->th_seq), ntohl(tcphdr->th_ack),
-               ntohs(tcphdr->th_win), 4*tcphdr->th_off);
-        printf("+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n\n");
-        packets += 1;
-        break;
- 
-    case IPPROTO_UDP:
-        udphdr = (struct udphdr*)packetptr;
-        printf("UDP  %s:%d -> %s:%d\n", srcip, ntohs(udphdr->uh_sport),
-               dstip, ntohs(udphdr->uh_dport));
-        printf("%s\n", iphdrInfo);
-	    printf("+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n\n");
-        packets += 1;
-        break;
- 
-    case IPPROTO_ICMP:
-        icmphdr = (struct icmp*)packetptr;
-        printf("ICMP %s -> %s\n", srcip, dstip);
-        printf("%s\n", iphdrInfo);
-        printf("Type:%d Code:%d ID:%d Seq:%d\n", icmphdr->icmp_type, icmphdr->icmp_code,
-               ntohs(icmphdr->icmp_hun.ih_idseq.icd_id), ntohs(icmphdr->icmp_hun.ih_idseq.icd_seq));
-	    printf("+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n\n");
-        packets += 1;
-        break;
+
+    // Get source and destination IP addresses as strings
+    inet_ntop(AF_INET, &iphdr->ip_src, srcip, INET_ADDRSTRLEN);
+    inet_ntop(AF_INET, &iphdr->ip_dst, dstip, INET_ADDRSTRLEN);
+    int packet_size = packethdr->len;
+
+    // Find or add source IP and update sent stats
+    struct IpStats* src_stats = find_or_add_ip(srcip);
+    src_stats->packets_sent += 1;
+    src_stats->bytes_sent += packet_size;
+
+    // Find or add destination IP and update received stats
+    struct IpStats* dst_stats = find_or_add_ip(dstip);
+    dst_stats->packets_received += 1;
+    dst_stats->bytes_received += packet_size;
+
+    packets += 1; // Increment total packet count
+}
+
+// Function to print IP statistics
+void print_ip_statistics() {
+    printf("\nIP Address Statistics:\n");
+    printf("%-15s %-10s %-10s %-10s %-10s\n", "IP Address", "Packets Sent", "Bytes Sent", "Packets Received", "Bytes Received");
+
+    struct IpStats* current = ip_statistics;
+    while (current != NULL) {
+        printf("%-15s %-10d %-10d %-10d %-10d\n", current->ip, current->packets_sent, current->bytes_sent, current->packets_received, current->bytes_received);
+        current = current->next;
     }
 }
 
-void stop_capture(int signo)
-{
+// Free linked list memory
+void free_ip_statistics() {
+    struct IpStats* current = ip_statistics;
+    while (current != NULL) {
+        struct IpStats* next = current->next;
+        free(current);
+        current = next;
+    }
+}
+
+// Modify stop_capture to display statistics before exiting
+void stop_capture(int signo) {
     struct pcap_stat stats;
- 
+
     if (pcap_stats(handle, &stats) >= 0) {
         printf("\n%d packets captured\n", packets);
         printf("%d packets received by filter\n", stats.ps_recv); 
         printf("%d packets dropped\n\n", stats.ps_drop);
     }
+
+    // Print IP statistics
+    print_ip_statistics();
+
+    // Free the linked list memory
+    free_ip_statistics();
+
     pcap_close(handle);
     exit(0);
 }
