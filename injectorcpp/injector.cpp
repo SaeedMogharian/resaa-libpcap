@@ -5,11 +5,9 @@
 #include <csignal>
 #include <pcap/pcap.h>
 #include <arpa/inet.h>
-#include <netinet/tcp.h>
-#include <netinet/udp.h>
 #include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
 #include <memory>
+#include <iomanip>
 
 struct IpStats {
     int packets_received = 0;
@@ -77,24 +75,34 @@ void packet_handler(u_char *user, const struct pcap_pkthdr *packethdr, const u_c
 
 void print_ip_statistics() {
     std::cout << "\nIP Address Statistics:\n";
-    std::cout << "IP Address       Packets Sent  Bytes Sent   Packets Received  Bytes Received\n";
+    std::cout << std::left << std::setw(17) << "IP Address"
+              << std::setw(15) << "Packets Sent"
+              << std::setw(12) << "Bytes Sent"
+              << std::setw(18) << "Packets Received"
+              << "Bytes Received\n";
+    
     for (const auto& [ip, stats] : ip_statistics) {
-        std::cout << ip <<                     "           "
-                  << stats.packets_sent     << "           " 
-                  << stats.bytes_sent       << "           " 
-                  << stats.packets_received << "           "
+        std::cout << std::left << std::setw(17) << ip
+                  << std::setw(15) << stats.packets_sent
+                  << std::setw(12) << stats.bytes_sent
+                  << std::setw(18) << stats.packets_received
                   << stats.bytes_received << "\n";
     }
 }
 
 void print_injection_report() {
     std::cout << "\nPacket Injection Report:\n";
-    std::cout << "Src Interface  Dst Interface  Src IP           Dst IP           Success\n";
+    std::cout << std::left << std::setw(15) << "Src Interface"
+              << std::setw(15) << "Dst Interface"
+              << std::setw(16) << "Src IP"
+              << std::setw(16) << "Dst IP"
+              << "Success\n";
+    
     for (const auto& report : injection_reports) {
-        std::cout << report.src_interface << "          "
-                  << report.dst_interface << "          "
-                  << report.src_ip << "      "
-                  << report.dst_ip << "      "
+        std::cout << std::left << std::setw(15) << report.src_interface
+                  << std::setw(15) << report.dst_interface
+                  << std::setw(16) << report.src_ip
+                  << std::setw(16) << report.dst_ip
                   << (report.success ? "Yes" : "No") << "\n";
     }
 }
