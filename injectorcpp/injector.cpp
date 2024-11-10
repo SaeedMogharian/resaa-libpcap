@@ -280,8 +280,21 @@ pcap_t* create_pcap_handle(std::string& device, const std::string& filter) {
         return nullptr;
     }
 
-    if (pcap_setfilter(handle, &bpf) == PCAP_ERROR) {
-        std::cerr << "pcap_setfilter(): " << pcap_geterr(handle) << std::endl;
+    if (!filter.empty()) {
+        if (pcap_compile(handle, &bpf, filter.c_str(), 1, netmask) == PCAP_ERROR) {
+            std::cerr << "pcap_compile(): " << pcap_geterr(handle) << std::endl;
+            return nullptr;
+        }
+
+        if (pcap_setfilter(handle, &bpf) == PCAP_ERROR) {
+            std::cerr << "pcap_setfilter(): " << pcap_geterr(handle) << std::endl;
+            return nullptr;
+        }
+    }
+    
+    // Only capture inbound packets (received packets)
+    if (pcap_setdirection(handle, PCAP_D_IN) == PCAP_ERROR) {
+        std::cerr << "pcap_setdirection(): " << pcap_geterr(handle) << std::endl;
         return nullptr;
     }
 
