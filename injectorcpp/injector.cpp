@@ -19,28 +19,28 @@ struct IpStats {
 std::unordered_map<std::string, IpStats> ip_statistics;
 
 // // Global variables for interface names
-// InjectionStat interface_a_stats;
-// InjectionStat interface_b_stats;
+// InjectionStat interface_prim_stats;
+// InjectionStat interface_secn_stats;
 
 // Global variables for interface names
-std::string interface_a;
-std::string interface_b;
+std::string interface_prim;
+std::string interface_secn;
+int packets_prim = 0;
+int packets_secn = 0;
+int injection_failures_prim = 0;
+int injection_failures_secn = 0;
 
 
-std::unique_ptr<pcap_t, decltype(&pcap_close)> handle_sniff_a(nullptr, pcap_close);
-std::unique_ptr<pcap_t, decltype(&pcap_close)> handle_inject_a(nullptr, pcap_close);
-std::unique_ptr<pcap_t, decltype(&pcap_close)> handle_sniff_b(nullptr, pcap_close);
-std::unique_ptr<pcap_t, decltype(&pcap_close)> handle_inject_b(nullptr, pcap_close);
+std::unique_ptr<pcap_t, decltype(&pcap_close)> handle_sniff_prim(nullptr, pcap_close);
+std::unique_ptr<pcap_t, decltype(&pcap_close)> handle_inject_prim(nullptr, pcap_close);
+std::unique_ptr<pcap_t, decltype(&pcap_close)> handle_sniff_secn(nullptr, pcap_close);
+std::unique_ptr<pcap_t, decltype(&pcap_close)> handle_inject_secn(nullptr, pcap_close);
 int linkhdrlen = 0;
-int packets_a = 0;
-int packets_b = 0;
-int injection_failures_a = 0;
-int injection_failures_b = 0;
+
 
 pcap_t* create_pcap_handle(std::string& device, const std::string& filter);
 
 void get_link_header_len(pcap_t* handle);
-
 
 void update_ip_statistics(const u_char* packet, int packet_size, const std::string& interface) {
     struct ip* iphdr = (struct ip*)(packet + linkhdrlen);
@@ -55,32 +55,30 @@ void update_ip_statistics(const u_char* packet, int packet_size, const std::stri
 }
 
 
-void packet_handler_a (u_char* user, const struct pcap_pkthdr* packethdr, const u_char* packetptr) {
-    packets_a++;
+void packet_handler_prim (u_char* user, const struct pcap_pkthdr* packethdr, const u_char* packetptr) {
+    packets_prim++;
     
-    if (!interface_b.empty()){
-        bool injection_success = (pcap_inject(handle_inject_b.get(), packetptr, packethdr->len) != PCAP_ERROR);
+    if (!interface_secn.empty()){
+        bool injection_success = (pcap_inject(handle_inject_secn.get(), packetptr, packethdr->len) != PCAP_ERROR);
         if (!injection_success) {
-            std::cerr << "Failed to inject packet from A to B: " << pcap_geterr(handle_inject_b.get()) << std::endl;
-            injection_failures_a++;
+            std::cerr << "Failed to inject packet from A to B: " << pcap_geterr(handle_inject_secn.get()) << std::endl;
+            injection_failures_prim++;
         }
     }
 
-    // Update IP statistics
-    update_ip_statistics(packetptr, packethdr->len, interface_a);
+    update_ip_statistics(packetptr, packethdr->len, interface_prim);
 };
 
-void packet_handler_b (u_char* user, const struct pcap_pkthdr* packethdr, const u_char* packetptr) {
-    packets_b++;
+void packet_handler_secn (u_char* user, const struct pcap_pkthdr* packethdr, const u_char* packetptr) {
+    packets_secn++;
     
-    bool injection_success = (pcap_inject(handle_inject_a.get(), packetptr, packethdr->len) != PCAP_ERROR);
+    bool injection_success = (pcap_inject(handle_inject_prim.get(), packetptr, packethdr->len) != PCAP_ERROR);
     if (!injection_success) {
-        std::cerr << "Failed to inject packet from B to A: " << pcap_geterr(handle_inject_a.get()) << std::endl;
-        injection_failures_b++;
+        std::cerr << "Failed to inject packet from B to A: " << pcap_geterr(handle_inject_prim.get()) << std::endl;
+        injection_failures_secn++;
     }
 
-    // Update IP statistics
-    update_ip_statistics(packetptr, packethdr->len, interface_b);
+    update_ip_statistics(packetptr, packethdr->len, interface_secn);
 };
 
 
@@ -109,28 +107,28 @@ void print_ip_statistics() {
 void print_injection_statistics() {
     std::cout << "\nInjection Statistics Report:\n";
     std::cout << std::left 
-              << std::setw(20) << "Received On Interface"
-              << std::setw(15) << "Packets Injected"
-              << std::setw(15) << "Failures"
-              << "Success Rate (%)\n";
+              << std::setw(22) << "ReceivedOnInterface"
+              << std::setw(17) << "PacketsInjected"
+              << std::setw(10) << "Failures"
+              << "SuccessRate (%)\n";
 
     // Print statistics for each interface
     std::cout << std::left 
-              << std::setw(20) << interface_a
-              << std::setw(15) << packets_a
-              << std::setw(15) << injection_failures_a
+              << std::setw(22) << interface_prim
+              << std::setw(17) << packets_prim
+              << std::setw(10) << injection_failures_prim
               << std::fixed << std::setprecision(2)
-              << (packets_a > 0 
-                  ? (100.0 * (packets_a - injection_failures_a) / packets_a) 
+              << (packets_prim > 0 
+                  ? (100.0 * (packets_prim - injection_failures_prim) / packets_prim) 
                   : 0.0)
               << "%\n";
     std::cout << std::left 
-            << std::setw(20) << interface_b
-            << std::setw(15) << packets_b
-            << std::setw(15) << injection_failures_b
+            << std::setw(22) << interface_secn
+            << std::setw(17) << packets_secn
+            << std::setw(10) << injection_failures_secn
             << std::fixed << std::setprecision(2)
-            << (packets_b > 0 
-                ? (100.0 * (packets_b - injection_failures_b) / packets_b) 
+            << (packets_secn > 0 
+                ? (100.0 * (packets_secn - injection_failures_secn) / packets_secn) 
                 : 0.0)
             << "%\n";
 
@@ -139,22 +137,22 @@ void print_injection_statistics() {
 
 void stop_capture(int signo) {
     struct pcap_stat stats;
-    if (pcap_stats(handle_sniff_a.get(), &stats) >= 0) {
+    if (pcap_stats(handle_sniff_prim.get(), &stats) >= 0) {
         std::cout << "\n"
-                  << interface_a << ":\n"
-                  << packets_a << " packets captured\n"
+                  << interface_prim << ":\n"
+                  << packets_prim << " packets captured\n"
                   << stats.ps_recv << " packets received by filter\n"
                   << stats.ps_drop << " packets dropped\n\n";
     }
-    if (!interface_b.empty() && pcap_stats(handle_sniff_b.get(), &stats) >= 0) {
+    if (!interface_secn.empty() && pcap_stats(handle_sniff_secn.get(), &stats) >= 0) {
         std::cout << "\n"
-                  << interface_b << ":\n"
-                  << packets_b << " packets captured\n"
+                  << interface_secn << ":\n"
+                  << packets_secn << " packets captured\n"
                   << stats.ps_recv << " packets received by filter\n"
                   << stats.ps_drop << " packets dropped\n\n";
     }
     print_ip_statistics();
-    if (!interface_b.empty()){
+    if (!interface_secn.empty()){
         print_injection_statistics();
     }
     exit(0);
@@ -169,10 +167,10 @@ int main(int argc, char* argv[]) {
                 std::cout << "usage: " << argv[0] << " [-h] [-i interface_sniff] [-j interface_inject] [-n count] [BPF expression]\n";
                 return 0;
             case 'i':
-                interface_a = optarg;
+                interface_prim = optarg;
                 break;
             case 'j':
-                interface_b = optarg;
+                interface_secn = optarg;
                 break;
             case 'n':
                 count = std::stoi(optarg);
@@ -180,7 +178,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    if (interface_a.empty()) {
+    if (interface_prim.empty()) {
         std::cerr << "At least one interface must be specified using -i.\n";
         return -1;
     }
@@ -197,46 +195,46 @@ int main(int argc, char* argv[]) {
     signal(SIGQUIT, stop_capture);
 
     // Create packet capture handles for both interfaces
-    handle_sniff_a.reset(create_pcap_handle(interface_a, filter));
-    if (!handle_sniff_a) return -1;
+    handle_sniff_prim.reset(create_pcap_handle(interface_prim, filter));
+    if (!handle_sniff_prim) return -1;
 
-    if (!interface_b.empty()){
-        handle_sniff_b.reset(create_pcap_handle(interface_b, filter));
-        if (!handle_sniff_b) return -1;
+    if (!interface_secn.empty()){
+        handle_sniff_secn.reset(create_pcap_handle(interface_secn, filter));
+        if (!handle_sniff_secn) return -1;
 
         // Create packet injection handles for both interfaces
-        handle_inject_a.reset(create_pcap_handle(interface_a, ""));
-        handle_inject_b.reset(create_pcap_handle(interface_b, ""));
-        if (!handle_inject_a || !handle_inject_b) return -1;
+        handle_inject_prim.reset(create_pcap_handle(interface_prim, ""));
+        handle_inject_secn.reset(create_pcap_handle(interface_secn, ""));
+        if (!handle_inject_prim || !handle_inject_secn) return -1;
     }
 
     
     // Get the type of link layer for both sniffing interfaces
-    get_link_header_len(handle_sniff_a.get());
+    get_link_header_len(handle_sniff_prim.get());
     if (linkhdrlen == 0) return -1;
 
     // Start packet capture on both interfaces using threads
-    std::thread sniff_a([&]() {
-        if (pcap_loop(handle_sniff_a.get(), count, [](u_char* user, const struct pcap_pkthdr* hdr, const u_char* pkt) {
-            (*(decltype(packet_handler_a)*)user)(nullptr, hdr, pkt);
-        }, (u_char*)&packet_handler_a) == PCAP_ERROR) {
-            std::cerr << "pcap_loop failed on interface A: " << pcap_geterr(handle_sniff_a.get()) << std::endl;
+    std::thread sniff_prim([&]() {
+        if (pcap_loop(handle_sniff_prim.get(), count, [](u_char* user, const struct pcap_pkthdr* hdr, const u_char* pkt) {
+            (*(decltype(packet_handler_prim)*)user)(nullptr, hdr, pkt);
+        }, (u_char*)&packet_handler_prim) == PCAP_ERROR) {
+            std::cerr << "pcap_loop failed on interface A: " << pcap_geterr(handle_sniff_prim.get()) << std::endl;
         }
     });
 
-    if (!interface_b.empty()){
-        std::thread sniff_b([&]() {
-            if (pcap_loop(handle_sniff_b.get(), count, [](u_char* user, const struct pcap_pkthdr* hdr, const u_char* pkt) {
-                (*(decltype(packet_handler_b)*)user)(nullptr, hdr, pkt);
-            }, (u_char*)&packet_handler_b) == PCAP_ERROR) {
-                std::cerr << "pcap_loop failed on interface B: " << pcap_geterr(handle_sniff_b.get()) << std::endl;
+    if (!interface_secn.empty()){
+        std::thread sniff_secn([&]() {
+            if (pcap_loop(handle_sniff_secn.get(), count, [](u_char* user, const struct pcap_pkthdr* hdr, const u_char* pkt) {
+                (*(decltype(packet_handler_secn)*)user)(nullptr, hdr, pkt);
+            }, (u_char*)&packet_handler_secn) == PCAP_ERROR) {
+                std::cerr << "pcap_loop failed on interface B: " << pcap_geterr(handle_sniff_secn.get()) << std::endl;
             }
         });
 
-        sniff_b.join();
+        sniff_secn.join();
     }
 
-    sniff_a.join();
+    sniff_prim.join();
     
 
     stop_capture(0);
