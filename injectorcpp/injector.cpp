@@ -61,7 +61,8 @@ void packet_handler_prim (u_char* user, const struct pcap_pkthdr* packethdr, con
     if (!interface_secn.empty()){
         bool injection_success = (pcap_inject(handle_inject_secn.get(), packetptr, packethdr->len) != PCAP_ERROR);
         if (!injection_success) {
-            std::cerr << "Failed to inject packet from A to B: " << pcap_geterr(handle_inject_secn.get()) << std::endl;
+            std::cerr << "Failed to inject packet from " << interface_prim <<" to "<< interface_secn <<": " << pcap_geterr(handle_inject_secn.get()) << std::endl;
+            std::cout << "Packet size: " << packethdr->len << std::endl;
             injection_failures_prim++;
         }
     }
@@ -74,7 +75,8 @@ void packet_handler_secn (u_char* user, const struct pcap_pkthdr* packethdr, con
     
     bool injection_success = (pcap_inject(handle_inject_prim.get(), packetptr, packethdr->len) != PCAP_ERROR);
     if (!injection_success) {
-        std::cerr << "Failed to inject packet from B to A: " << pcap_geterr(handle_inject_prim.get()) << std::endl;
+        std::cerr << "Failed to inject packet from "<< interface_secn <<" to "<< interface_prim <<": " << pcap_geterr(handle_inject_prim.get()) << std::endl;
+        std::cout << "Packet size: " << packethdr->len << std::endl;
         injection_failures_secn++;
     }
 
@@ -155,7 +157,11 @@ void stop_capture(int signo) {
     if (!interface_secn.empty()){
         print_injection_statistics();
     }
-    exit(0);
+    handle_sniff_prim.reset(); // Ensures cleanup
+    handle_sniff_secn.reset();
+    handle_inject_prim.reset();
+    handle_inject_secn.reset();
+    std::exit(0);
 }
 int main(int argc, char* argv[]) {
     int count = 0;
@@ -181,6 +187,11 @@ int main(int argc, char* argv[]) {
     if (interface_prim.empty()) {
         std::cerr << "At least one interface must be specified using -i.\n";
         return -1;
+    }
+    if (interface_secn.empty()){
+        std::cerr << "Sniffing on" << interface_prim << ".\n";
+    } else {
+        std::cerr << "Sniffing & Injecting " << interface_prim << "::" << interface_secn << ".\n";
     }
 
     // Concatenate remaining command-line arguments to form the filter
@@ -218,7 +229,7 @@ int main(int argc, char* argv[]) {
         if (pcap_loop(handle_sniff_prim.get(), count, [](u_char* user, const struct pcap_pkthdr* hdr, const u_char* pkt) {
             (*(decltype(packet_handler_prim)*)user)(nullptr, hdr, pkt);
         }, (u_char*)&packet_handler_prim) == PCAP_ERROR) {
-            std::cerr << "pcap_loop failed on interface A: " << pcap_geterr(handle_sniff_prim.get()) << std::endl;
+            std::cerr << "pcap_loop failed on interface " << interface_prim << ": " << pcap_geterr(handle_sniff_prim.get()) << std::endl;
         }
     });
 
@@ -227,7 +238,7 @@ int main(int argc, char* argv[]) {
             if (pcap_loop(handle_sniff_secn.get(), count, [](u_char* user, const struct pcap_pkthdr* hdr, const u_char* pkt) {
                 (*(decltype(packet_handler_secn)*)user)(nullptr, hdr, pkt);
             }, (u_char*)&packet_handler_secn) == PCAP_ERROR) {
-                std::cerr << "pcap_loop failed on interface B: " << pcap_geterr(handle_sniff_secn.get()) << std::endl;
+                std::cerr << "pcap_loop failed on interface " << interface_prim << ": " << pcap_geterr(handle_sniff_secn.get()) << std::endl;
             }
         });
 
@@ -261,22 +272,22 @@ pcap_t* create_pcap_handle(std::string& device, const std::string& filter) {
         return nullptr;
     }
 
-    pcap_t* handle = pcap_open_live(device.c_str(), BUFSIZ, 1, 1000, errbuf);
+    // pcap_t* handle = pcap_open_live(device.c_str(), BUFSIZ, 1, 1000, errbuf);
+    pcap_t* handle = pcap_open_live(device.c_str(), 65535, 1, 1000, errbuf);
     if (!handle) {
         std::cerr << "pcap_open_live(): " << errbuf << std::endl;
         return nullptr;
     }
 
-    if (pcap_compile(handle, &bpf, filter.c_str(), 1, netmask) == PCAP_ERROR) {
-        std::cerr << "pcap_compile(): " << pcap_geterr(handle) << std::endl;
-        return nullptr;
-    }
 
     if (!filter.empty()) {
         if (pcap_compile(handle, &bpf, filter.c_str(), 1, netmask) == PCAP_ERROR) {
             std::cerr << "pcap_compile(): " << pcap_geterr(handle) << std::endl;
+            pcap_close(handle);
             return nullptr;
         }
+        pcap_freecode(&bpf);
+
 
         if (pcap_setfilter(handle, &bpf) == PCAP_ERROR) {
             std::cerr << "pcap_setfilter(): " << pcap_geterr(handle) << std::endl;
