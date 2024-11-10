@@ -18,9 +18,8 @@ struct IpStats {
 
 std::unordered_map<std::string, IpStats> ip_statistics;
 
-// // Global variables for interface names
-// InjectionStat interface_prim_stats;
-// InjectionStat interface_secn_stats;
+
+
 
 // Global variables for interface names
 std::string interface_prim;
