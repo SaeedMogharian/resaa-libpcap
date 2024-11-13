@@ -16,11 +16,24 @@ unique_ptr<pcap_t, decltype(&pcap_close)> createPcapHandleWrapper(pcap_t* raw_ha
     return unique_ptr<pcap_t, decltype(&pcap_close)>(raw_handle, &pcap_close);
 }
 
+void get_link_header_len(pcap_t* handle) {
+    int linktype = pcap_datalink(handle);
+    if (linktype == PCAP_ERROR) {
+        std::cerr << "pcap_datalink(): " << pcap_geterr(handle) << std::endl;
+        return;
+    }
 
-// Forward declarations
-class PacketHandler;
-class StatisticsManager;
-class CaptureSession;
+    switch (linktype) {
+        case DLT_NULL: linkhdrlen = 4; break;
+        case DLT_EN10MB: linkhdrlen = 14; break;
+        case DLT_SLIP:
+        case DLT_PPP: linkhdrlen = 24; break;
+        default: linkhdrlen = 0;
+    }
+}
+
+int linkhdrlen;
+
 
 class IpStats {
 public:
@@ -41,22 +54,14 @@ private:
     unordered_map<string, IpStats> ip_statistics;
 
 public:
-    void update(const u_char* packet, int packet_size, const string& interface, int linkhdrlen) {
+    void update(const u_char* packet, int packet_size, const string& interface) {
+        auto* iphdr = reinterpret_cast<const struct ip*>(packet + linkhdrlen);
 
-        linkhdrlen = 14;
+        // Convert the source IP to a string
+        string src_ip = inet_ntoa(iphdr->ip_src);
 
-        struct ip* iphdr = (struct ip*)(packet + linkhdrlen);
-
-        char dstip[INET_ADDRSTRLEN];
-
-
-        if (!inet_ntop(AF_INET, &iphdr->ip_src, dstip, INET_ADDRSTRLEN)) {
-            cerr << "inet_ntop failed: " << strerror(errno) << endl;
-            return;
-        }
-
-
-        auto& stats = ip_statistics[dstip];
+        // Update statistics
+        auto& stats = ip_statistics[src_ip];
         stats.packets_sent++;
         stats.bytes_sent += packet_size;
         stats.interface = interface;
@@ -95,12 +100,10 @@ public:
 
     PacketHandler(unique_ptr<pcap_t, decltype(&pcap_close)> injectionHandle,
                   const string& interface,
-                  StatisticsManager& stats,
-                  int linkHeaderLen)
+                  StatisticsManager& stats)
         : injection_handle(move(injectionHandle)),
           interface_name(interface),
-          stats_manager(stats),
-          linkhdrlen(linkHeaderLen) {}
+          stats_manager(stats) {}
 
     static void packetCallback(u_char* user, const struct pcap_pkthdr* hdr, const u_char* pkt) {
         auto* handler = reinterpret_cast<PacketHandler*>(user);
@@ -116,7 +119,7 @@ public:
             injection_failures++;
         }
 
-        stats_manager.update(packetptr, packethdr->len, interface_name, linkhdrlen);
+        stats_manager.update(packetptr, packethdr->len, interface_name);
     }
 
     void printInjectionStatistics() const {
@@ -140,35 +143,14 @@ private:
     string interface_name;
     unique_ptr<pcap_t, decltype(&pcap_close)> sniff_handle;
     PacketHandler packet_handler;
-    int linkhdrlen;
     volatile bool stop_flag = false; // Stop flag for capture loop
 
 public:
-    void calculateLinkHeaderLength() {
-        int linktype = pcap_datalink(sniff_handle.get());
-        if (linktype == PCAP_ERROR) {
-            cout << "in if" << endl;
-            cerr << "pcap_datalink(): " << pcap_geterr(sniff_handle.get()) << endl;
-            return;
-        }
-
-        cout << "########### linktype " << linktype << endl;
-
-        switch (linktype) {
-            case DLT_NULL: linkhdrlen = 4; break;
-            case DLT_EN10MB: linkhdrlen = 14; break;
-            case DLT_SLIP:
-            case DLT_PPP: linkhdrlen = 24; break;
-            default: linkhdrlen = 0;
-        }
-    }
-
     CaptureSession(const string& interface, const string& filter, PacketHandler handler)
         : interface_name(interface),
           sniff_handle(nullptr, pcap_close),
           packet_handler(move(handler)) {
         sniff_handle.reset(createPcapHandle(interface, filter));
-        calculateLinkHeaderLength();
     }
 
     PacketHandler& getPacketHandler() {
