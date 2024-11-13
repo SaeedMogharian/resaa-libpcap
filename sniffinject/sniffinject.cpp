@@ -30,37 +30,31 @@ public:
     string interface;
 
     // Constructor to initialize attributes (optional)
-    IpStats(int packet, int byte, string intr) : packets_sent(packet), bytes_sent(byte, interface(intr)) {}
+    IpStats(int packet, int byte, const string& intr) : packets_sent(packet), bytes_sent(byte), interface(intr) {}
+
 };
 
 
 // Statistics Manager
 class StatisticsManager {
 private:
-    // struct IpStats {
-    //     int packets_sent = 0;
-    //     int bytes_sent = 0;
-    //     string interface;
-    // };
-
     unordered_map<string, IpStats> ip_statistics;
 
 public:
     void update(const u_char* packet, int packet_size, const string& interface, int linkhdrlen) {
-        cout << "####################### start update function" << endl;
-        cout << "len" << linkhdrlen << endl;
-        cout << "size" << packet_size << endl;
 
         linkhdrlen = 14;
 
         struct ip* iphdr = (struct ip*)(packet + linkhdrlen);
 
-        cout << INET_ADDRSTRLEN << endl;
         char dstip[INET_ADDRSTRLEN];
 
 
-        inet_ntop(AF_INET, &iphdr->ip_src, dstip, INET_ADDRSTRLEN);
-        cout << "#######################" << dstip << endl;
+        if (!inet_ntop(AF_INET, &iphdr->ip_src, dstip, INET_ADDRSTRLEN)) {
+            cerr << "inet_ntop failed: " << strerror(errno) << endl;
+            return;
+        }
+
 
         auto& stats = ip_statistics[dstip];
         stats.packets_sent++;
@@ -121,8 +115,7 @@ public:
                       << pcap_geterr(injection_handle.get()) << "\n";
             injection_failures++;
         }
-        cout << "before update call" << endl;
-        cout << "###### len" << linkhdrlen << endl;
+
         stats_manager.update(packetptr, packethdr->len, interface_name, linkhdrlen);
     }
 
@@ -402,7 +395,6 @@ public:
 Application* global_app = nullptr;
 
 int main(int argc, char* argv[]) {
-    cout << "run" << endl;
     Application app;
     global_app = &app; // Set the global application pointer for signal handling
 
