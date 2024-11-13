@@ -1,23 +1,22 @@
-# Compiler and flags for C++
-CC          = g++
-CFLAGS      = -c -Wall
-LDFLAGS     = -lpcap
-SOURCES     = sniffinject.cpp
-INCLUDES    = -I.
-OBJECTS     = $(SOURCES:.cpp=.o)
-TARGET      = sniffinject
+CC = g++
+CFLAGS = -Wall -std=c++17 -I./src
+LDFLAGS = -lpcap
 
-# Default target to build the executable
-all: $(SOURCES) $(TARGET)
+SRC_DIR = src
+OBJ_DIR = obj
+BIN = bridge
 
-# Link the object files to create the executable
-$(TARGET): $(OBJECTS) 
-	$(CC) $(OBJECTS) $(LDFLAGS) -o $@  
+SRC = $(wildcard $(SRC_DIR)/*.cpp)
+OBJ = $(SRC:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 
-# Compile the source file into an object file
-.cpp.o:
-	$(CC) $(CFLAGS) $(INCLUDES) $< -o $@
+all: $(BIN)
 
-# Clean target to remove object files and executable
+$(BIN): $(OBJ)
+	$(CC) $^ -o $@ $(LDFLAGS)
+
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
+	@mkdir -p $(OBJ_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 clean:
-	rm -rf $(OBJECTS) $(TARGET)
+	rm -rf $(OBJ_DIR) $(BIN)
