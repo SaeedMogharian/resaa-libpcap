@@ -24,10 +24,10 @@ void PacketHandler::handle(const struct pcap_pkthdr* packethdr, const u_char* pa
     stats_manager.update(packetptr, packethdr->len, interface_name, link_header_length);
 }
 
-void PacketHandler::printInjectionStatistics() const {
+void PacketHandler::print() const {
     std::cout << std::left
               << std::setw(22) << interface_name
-              << std::setw(17) << packets_processed
+              << std::setw(21) << packets_processed
               << std::setw(10) << injection_failures
               << (packets_processed > 0
                   ? (100.0 * (packets_processed - injection_failures) / packets_processed)

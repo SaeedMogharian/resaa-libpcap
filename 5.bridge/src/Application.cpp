@@ -79,15 +79,15 @@ void Application::stop() {
         std::cout << "\nInjection Statistics Report:\n";
         std::cout << std::left
                   << std::setw(22) << "ReceivedOnInterface"
-                  << std::setw(17) << "PacketsInjected"
+                  << std::setw(21) << "PacketsInjectedFrom"
                   << std::setw(10) << "Failures"
                   << "SuccessRate (%)\n";
 
         if (primary_session) {
-            primary_session->getPacketHandler().printInjectionStatistics();
+            primary_session->getPacketHandler().print();
         }
         if (secondary_session) {
-            secondary_session->getPacketHandler().printInjectionStatistics();
+            secondary_session->getPacketHandler().print();
         }
     }
 
