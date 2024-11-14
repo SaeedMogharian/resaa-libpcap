@@ -43,7 +43,8 @@ public:
     string interface;
 
     // Constructor to initialize attributes (optional)
-    IpStats(int packet, int byte, const string& intr) : packets_sent(packet), bytes_sent(byte), interface(intr) {}
+    IpStats(int packet, int byte, const string& intr)
+        : packets_sent(packet), bytes_sent(byte), interface(intr) {}
 
 };
 
@@ -56,8 +57,6 @@ private:
 public:
     void update(const u_char* packet, int packet_size, const string& interface) {
         auto* iphdr = reinterpret_cast<const struct ip*>(packet + linkhdrlen);
-
-        // Convert the source IP to a string
         string src_ip = inet_ntoa(iphdr->ip_src);
 
         // Update statistics
@@ -68,18 +67,16 @@ public:
     }
 
     void print() const {
-        cout << "\nIP Address Statistics:\n";
+        cout << "\nIP Address Statistics On Interface: "<< <<"\n";
         cout << left << setw(17) << "IP Address"
                   << setw(15) << "Packets Sent"
                   << setw(12) << "Bytes Sent"
-                  << setw(12) << "Interface" << "\n";
 
         for (const auto& [ip, stats] : ip_statistics) {
             cout << left
                       << setw(17) << ip
                       << setw(15) << stats.packets_sent
-                      << setw(12) << stats.bytes_sent
-                      << setw(12) << stats.interface << "\n";
+                      << setw(12) << stats.bytes_sent << "\n";
         }
     }
 };
@@ -378,7 +375,7 @@ Application* global_app = nullptr;
 
 int main(int argc, char* argv[]) {
     Application app;
-    global_app = &app; // Set the global application pointer for signal handling
+    global_app = &app; // Set the global ap     lication pointer for signal handling
 
     // Set up signal handlers
     signal(SIGINT, [](int signo) { if (global_app) global_app->stop(); });
