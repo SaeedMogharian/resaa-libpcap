@@ -13,6 +13,7 @@
 #include <utility>
 #include <functional>
 #include <thread>
+#include <vector>
 
 using namespace std;
 
@@ -220,6 +221,12 @@ class Connection {
 
             LibPcapWrapper::pcapConn* primary_inject = LibPcapWrapper::openLiveConnection(primary, "");
             LibPcapWrapper::pcapConn* secondary_inject = LibPcapWrapper::openLiveConnection(primary, "");
+
+
+            std::vector<std::thread> threads;
+            // Create a thread for each device
+            threads.emplace_back(LibPcapWrapper::startPacketCapture, injector, primary_sniff);
+            threads.emplace_back(LibPcapWrapper::startPacketCapture, injector, secondary_sniff);
 
             // thread prim_thread(&CaptureSession::startCapture, primary_session.get(), count);
             // thread sec_thread(&CaptureSession::startCapture, primary_session.get(), count);

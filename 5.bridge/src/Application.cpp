@@ -48,7 +48,7 @@ void Application::run(int argc, char* argv[]) {
         primary_session->startCapture(count);
     }
 
-    stats_manager.print();
+    stop();
 }
 
 void Application::stop() {
