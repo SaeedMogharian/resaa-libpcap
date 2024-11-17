@@ -21,6 +21,7 @@ using namespace std;
 class LibPcapWrapper {
     public:
         using pcapConn = pcap_t;
+        using packetHeader = struct pcap_pkthdr;
         static pcapConn* openLiveConnection(const string& interface_name, const string& filter) {
             char errbuf[PCAP_ERRBUF_SIZE];
             struct bpf_program bpf;
@@ -59,53 +60,54 @@ class LibPcapWrapper {
             }
             return conn;
         }
-        // PCAP_API int	pcap_loop(pcap_t *, int, pcap_handler, u_char *);
-        static void startPacketCapture(const function<void()> &packetManager, pcapConn* conn, int packet_count = 0) {
-            if (!conn) {
-                cerr << "Error: No valid capture handle" << endl;
-                return;
-            }
+        // PCAP_API int	pcap_loop(pcap_t*, int, pcap_handler, u_char *);
+        // static void startPacketCapture(const function<void()> &packetManager, pcapConn* conn, int packet_count = 0) {
+        //     if (!conn) {
+        //         cerr << "Error: No valid capture handle" << endl;
+        //         return;
+        //     }
 
-            // Start the packet capture with a set count or continually if the count is 0.
-            int result = pcap_loop(conn, packet_count, packetManager, reinterpret_cast<u_char*>(nullptr));
-            if (result == PCAP_ERROR) {
-                cerr << "Error in pcap_loop (" << interface_name << "): "
-                    << pcap_geterr(conn) << endl;
-            }
-        }
-        static void packetInjection(const pcapConn* to, const struct pcap_pkthdr* packet_header, const u_char* packet_pointer) {
+        //     // Start the packet capture with a set count or continually if the count is 0.
+        //     int result = pcap_loop(conn, packet_count, packetManager, reinterpret_cast<u_char*>(nullptr));
+        //     if (result == PCAP_ERROR) {
+        //         cerr << "Error in pcap_loop (" << interface_name << "): "
+        //             << pcap_geterr(conn) << endl;
+        //     }
+        // }
+        static void packetInjection(pcap_t* to, const struct pcap_pkthdr* packet_header, const u_char* packet_pointer) {
             int result = pcap_inject(to, packet_pointer, packet_header->len);
             if (result == PCAP_ERROR) {
                 cerr << "Failed to inject packet: "
-                          << pcap_geterr(injection_handle.get()) << endl;
+                          << pcap_geterr(to) << endl;
             }
         }
 
-        static u_char* packetCapture(pcapConn* conn){
-            struct pcap_pkthdr* header;
-            const u_char* packet = pcap_next(handle, header);
-            if (packet) {
-                cout << "Captured a packet with length:"<< header.len <<" bytes"<< endl;
-                return header.len;
-            } else {
-                cout << "Packet capture failed" << endl;
-                return -1;
-            }
+        // static pair<u_char*, int>  packetCapture(pcapConn* conn){
+        //     struct pcap_pkthdr* header;
+        //     const u_char* packet = pcap_next(conn, header);
+        //     pair<string, string> packet;
+        //     if (packet) {
+        //         cout << "Captured a packet with length:"<< header.len <<" bytes"<< endl;
+        //         return make_pair;
+        //     } else {
+        //         cout << "Packet capture failed" << endl;
+        //         return -1;
+        //     }
 
-        }
+        // }
            // const u_char *pcap_next(pcap_t *p, struct pcap_pkthdr *h);
            // int pcap_next_ex(pcap_t *p, struct pcap_pkthdr **pkt_header, const u_char **pkt_data);
 
-        static pair<string, string> stopPacketCapture(pcapConn conn) {
-              pcap_breakloop(conn);
-              pair<string, string> stats_report;
-              struct pcap_stat stats;
-              if (pcap_stats(conn, &stats) >= 0) {
-                  stats_report = make_pair(static_cast<string>(stats.ps_recv), static_cast<string>(stats.ps_drop));
-              }
-              pcap_close(conn);
-              return stats_report;
-        }
+        // static pair<string, string> stopPacketCapture(pcapConn conn) {
+        //       pcap_breakloop(conn);
+        //       pair<string, string> stats_report;
+        //       struct pcap_stat stats;
+        //       if (pcap_stats(conn, &stats) >= 0) {
+        //           stats_report = make_pair(static_cast<string>stats.ps_recv, static_cast<string>stats.ps_drop);
+        //       }
+        //       pcap_close(conn);
+        //       return stats_report;
+        // }
         static int getLinkHeaderLen(pcapConn* conn) {
             int linkhdrlen = 0;
             int linktype = pcap_datalink(conn);
@@ -153,7 +155,6 @@ class Interface {
                      << setw(12) << entry.second.second << endl;
             }
         }
-
         // Update both packet and byte counts for a specific IP address
         void updateIpStats(const string& ip, int packets_size) {
             if (ip_stats.find(ip) != ip_stats.end()) {
@@ -163,7 +164,6 @@ class Interface {
                 ip_stats[ip] = make_pair(1, packets_size); // Initialize if not present
             }
         }
-
         int getPacketsCount() const {
             int totalPackets = 0;
             for (const auto& entry : ip_stats) {
@@ -173,7 +173,8 @@ class Interface {
         }
 
         // get IP from packet pointer
-        string getIpFromPacket(const u_char* packet) const {
+        string getIpFromPacket(const u_char* packet) {
+            
             auto* ip_header = reinterpret_cast<const struct ip*>(packet + link_header_len);
             string src_ip = inet_ntoa(ip_header->ip_src);
             return src_ip;
@@ -185,111 +186,159 @@ class Interface {
         void setLinkHeaderLen(const int len) {
             link_header_len = len;
         }
-};
 
 
-class Connection {
-    private:
-        Interface* primary;
-        Interface* secondary;
-        string filter;
-
-        int injection_failures = 0;
-
-        void sniffer(u_char *user, const struct pcap_pkthdr* packet_header, const u_char* packet_pointer) {
-            const string ip = primary.getIpFromPacket(packet_pointer);
-            primary.updateIpStats(ip, packet_header->len);
-            // packet_pointer, packet_header->len, primary.getName());
-        }
-
-        void injector(u_char *user, const struct pcap_pkthdr* packet_header, const u_char* packet_pointer, Interface inj_int = Interface("")) {
-            sniffer(user, packet_header, packet_pointer);
-            LibPcapWrapper::pcapConn* conn = LibPcapWrapper::openLiveConnection(inj_int, "");
-            LibPcapWrapper::packetInjection(conn, packet_header, packet_pointer);
-        }
-
-    public:
-        explicit Connection(Interface primary_nic, Interface secondary_nic, string conn_filter)
-            : primary(move(primary_nic)), secondary(move(secondary_nic)), filter(move(conn_filter)) {}
-
-        static void stopSniff(LibPcapWrapper::pcapConn* conn, const Interface* interface) {
-            string recv, drop;
-            recv, drop = LibPcapWrapper::stopPacketCapture(conn);
-            cout << endl << "On Interface " << interface->getName() << endl
-                << interface->getPacketsCount() << " packets processed" << endl
-                << recv << " packets received by filter" << endl
-                << drop << " packets dropped" << endl << endl;
-
-            interface->printIpStats();
-            pcap_close(conn);
-        }
-
-        static void stopInject(const Interface* prim, const Interface* secon) {
-            int all = prim->getPacketsCount()+secon->getPacketCount();
-            cout << left
-                  << setw(22) << prim->getName() << "::" << secon->getName()
-                  << setw(17) << all
-                  << setw(10) << injection_failures
-                  << (all > 0
-                      ? (100.0 * (all - injection_failures) / all)
-                      : 0.0)
-                  << endl;
-        }
-
-        void monitoring() {
-            LibPcapWrapper::pcapConn* sniff = LibPcapWrapper::openLiveConnection(primary, filter);
-            primary.setLinkHeaderLen(LibPcapWrapper::getLinkHeaderLen(sniff));
-            LibPcapWrapper::startPacketCapture(sniffer, sniff);
-            stopSniff(sniff);
-            exit(0);
-        }
-
-
-        void bridge() {
-            LibPcapWrapper::pcapConn* primary_sniff = LibPcapWrapper::openLiveConnection(primary, filter);
-            LibPcapWrapper::pcapConn* secondary_sniff = LibPcapWrapper::openLiveConnection(secondary, filter);
-            secondary.setLinkHeaderLen(LibPcapWrapper::getLinkHeaderLen(secondary_sniff));
-            primary.setLinkHeaderLen(LibPcapWrapper::getLinkHeaderLen(primary_sniff));
-
-
-            std::vector<std::thread> threads;
-
-            // Start packet capture for primary connection
-            threads.emplace_back([primary_sniff, secondary]() {
-                LibPcapWrapper::startPacketCapture(injector, primary_sniff, secondary);
-            });
-
-            // Start packet capture for secondary connection
-            threads.emplace_back([secondary_sniff, primary]() {
-                LibPcapWrapper::startPacketCapture(injector, secondary_sniff, primary);
-            });
-
-            // Wait for both threads to complete
-            for (auto& t : threads) {
-                if (t.joinable()) {
-                    t.join();
+        const u_char* packetCapture(string filter = ""){
+            LibPcapWrapper::pcapConn* conn = LibPcapWrapper::openLiveConnection(name, filter);
+            setLinkHeaderLen(LibPcapWrapper::getLinkHeaderLen(conn));
+            struct pcap_pkthdr packet_header;
+            const u_char* packet = pcap_next(conn, &packet_header);
+            if (packet) {
+                cout << "Packet:"<< packet_header.len <<" bytes. From: "<< getIpFromPacket(packet) << endl;
+                struct pcap_stat stats;
+                if (pcap_stats(conn, &stats) >= 0) {
+                    stats_report = make_pair(static_cast<string>stats.ps_recv, static_cast<string>stats.ps_drop);
                 }
+                pcap_close(conn);
+                return packet;
+            } else {
+                cout << "Packet capture failed" << endl;
+                return nullptr;
             }
-
-            // Stop sniffing on both connections
-            stopSniff(primary_sniff, primary);
-            stopSniff(secondary_sniff, secondary);
-            stopInject(primary, secondary)
-
-            exit(0);
         }
-    }
+
+        static void packetInjection(LibPcapWrapper::pcapConn* to, const struct pcap_pkthdr* packet_header, const u_char* packet_pointer) {
+            int result = pcap_inject(to, packet_pointer, packet_header->len);
+            if (result == PCAP_ERROR) {
+                cerr << "Failed to inject packet: "
+                          << pcap_geterr(to) << endl;
+            }
+        }
+
 };
+
+
+// class Connection {
+//     private:
+//         Interface* primary;
+//         Interface* secondary;
+//         string filter;
+
+//         int injection_failures = 0;
+
+//         void sniffer(u_char *user, const struct pcap_pkthdr* packet_header, const u_char* packet_pointer) {
+//             const string ip = primary.getIpFromPacket(packet_pointer);
+//             primary.updateIpStats(ip, packet_header->len);
+//             // packet_pointer, packet_header->len, primary.getName());
+//         }
+
+//         void injector(u_char *user, const struct pcap_pkthdr* packet_header, const u_char* packet_pointer, Interface inj_int = Interface("")) {
+//             sniffer(user, packet_header, packet_pointer);
+//             LibPcapWrapper::pcapConn* conn = LibPcapWrapper::openLiveConnection(inj_int, "");
+//             LibPcapWrapper::packetInjection(conn, packet_header, packet_pointer);
+//         }
+
+//     public:
+//         explicit Connection(Interface primary_nic, Interface secondary_nic, string conn_filter)
+//             : primary(move(primary_nic)), secondary(move(secondary_nic)), filter(move(conn_filter)) {}
+
+//         static void stopSniff(LibPcapWrapper::pcapConn* conn, const Interface* interface) {
+//             string recv, drop;
+//             recv, drop = LibPcapWrapper::stopPacketCapture(conn);
+//             cout << endl << "On Interface " << interface->getName() << endl
+//                 << interface->getPacketsCount() << " packets processed" << endl
+//                 << recv << " packets received by filter" << endl
+//                 << drop << " packets dropped" << endl << endl;
+
+//             interface->printIpStats();
+//             pcap_close(conn);
+//         }
+
+//         static void stopInject(const Interface* prim, const Interface* secon) {
+//             int all = prim->getPacketsCount()+secon->getPacketCount();
+//             cout << left
+//                   << setw(22) << prim->getName() << "::" << secon->getName()
+//                   << setw(17) << all
+//                   << setw(10) << injection_failures
+//                   << (all > 0
+//                       ? (100.0 * (all - injection_failures) / all)
+//                       : 0.0)
+//                   << endl;
+//         }
+
+//         void monitoring() {
+//             LibPcapWrapper::pcapConn* sniff = LibPcapWrapper::openLiveConnection(primary, filter);
+//             primary.setLinkHeaderLen(LibPcapWrapper::getLinkHeaderLen(sniff));
+//             LibPcapWrapper::startPacketCapture(sniffer, sniff);
+//             stopSniff(sniff);
+//             exit(0);
+//         }
+
+
+//         void bridge() {
+//             LibPcapWrapper::pcapConn* primary_sniff = LibPcapWrapper::openLiveConnection(primary, filter);
+//             LibPcapWrapper::pcapConn* secondary_sniff = LibPcapWrapper::openLiveConnection(secondary, filter);
+//             secondary.setLinkHeaderLen(LibPcapWrapper::getLinkHeaderLen(secondary_sniff));
+//             primary.setLinkHeaderLen(LibPcapWrapper::getLinkHeaderLen(primary_sniff));
+
+
+//             std::vector<std::thread> threads;
+
+//             // Start packet capture for primary connection
+//             threads.emplace_back([primary_sniff, secondary]() {
+//                 LibPcapWrapper::startPacketCapture(injector, primary_sniff, secondary);
+//             });
+
+//             // Start packet capture for secondary connection
+//             threads.emplace_back([secondary_sniff, primary]() {
+//                 LibPcapWrapper::startPacketCapture(injector, secondary_sniff, primary);
+//             });
+
+//             // Wait for both threads to complete
+//             for (auto& t : threads) {
+//                 if (t.joinable()) {
+//                     t.join();
+//                 }
+//             }
+
+//             // Stop sniffing on both connections
+//             stopSniff(primary_sniff, primary);
+//             stopSniff(secondary_sniff, secondary);
+//             stopInject(primary, secondary)
+
+//             exit(0);
+//         }
+//     }
+// };
 
 int main(int argc, char* argv[]) {
+    Interface e1 = Interface("ens160");
+    Interface e2 = Interface("ens192");
+
+    cout << e1.getName() << endl;
+    int n = 10;
+    // \ i = 1;
+    const u_char* packet_prev = e1.packetCapture();
+    for (int i =1; i <= n; i++){
+        const u_char* packet_next = e1.packetCapture();
+        if (packet_next == packet_prev){
+            cout << "duplicate" << endl;
+            break;
+        } else {
+            packet_next = packet_prev;
+        }
+        
+    }
+    
+    
   // Application app;
   // global_app = &app; // Set the global application pointer for signal handling
 
   // Set up signal handlers
-  signal(SIGINT, [](int signo) { if (global_app) global_app->stop(); });
-  signal(SIGTERM, [](int signo) { if (global_app) global_app->stop(); });
-  signal(SIGQUIT, [](int signo) { if (global_app) global_app->stop(); });
-  //
+//   signal(SIGINT, [](int signo) { if (global_app) global_app->stop(); });
+//   signal(SIGTERM, [](int signo) { if (global_app) global_app->stop(); });
+//   signal(SIGQUIT, [](int signo) { if (global_app) global_app->stop(); });
+//   //
   // app.run(argc, argv);
   return 0;
 }
