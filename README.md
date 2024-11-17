@@ -51,3 +51,8 @@ Two Windows versions of libpcap are available. The older one is named [WinPcap](
 
 https://wiki.wireshark.org/Development/LibpcapFileFormat
 
+# PcapPlusPlus
+https://pcapplusplus.github.io/docs/features
+
+download and get it beside the project:
+https://github.com/seladb/PcapPlusPlus/releases/download/v24.09/pcapplusplus-24.09-ubuntu-22.04-gcc-11.4.0-x86_64.tar.gz
