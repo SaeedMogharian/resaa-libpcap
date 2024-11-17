@@ -174,9 +174,10 @@ class Interface {
 
 class Connection {
     private:
-        Interface primary;
-        Interface secondary;
+        Interface* primary;
+        Interface* secondary;
         string filter;
+
         int injection_failures = 0;
 
         void sniffer(u_char *user, const struct pcap_pkthdr* packet_header, const u_char* packet_pointer) {
@@ -185,8 +186,9 @@ class Connection {
             // packet_pointer, packet_header->len, primary.getName());
         }
 
-        void injector(u_char *user, const struct pcap_pkthdr* packet_header, const u_char* packet_pointer) {
+        void injector(u_char *user, const struct pcap_pkthdr* packet_header, const u_char* packet_pointer, Interface inj_int = Interface("")) {
             sniffer(user, packet_header, packet_pointer);
+            LibPcapWrapper::pcapConn* conn = LibPcapWrapper::openLiveConnection(inj_int, "");
             LibPcapWrapper::packetInjection(conn, packet_header, packet_pointer);
         }
 
@@ -205,11 +207,24 @@ class Connection {
             interface->printIpStats();
         }
 
+        static void stopInject(const Interface* prim, const Interface* secon) {
+            int all = prim->getPacketsCount()+secon->getPacketCount();
+            cout << left
+                  << setw(22) << prim->getName() << "::" << secon->getName()
+                  << setw(17) << all
+                  << setw(10) << injection_failures
+                  << (all > 0
+                      ? (100.0 * (all - injection_failures) / all)
+                      : 0.0)
+                  << endl;
+        }
+
         void monitoring() {
             LibPcapWrapper::pcapConn* sniff = LibPcapWrapper::openLiveConnection(primary, filter);
             primary.setLinkHeaderLen(LibPcapWrapper::getLinkHeaderLen(sniff));
             LibPcapWrapper::startPacketCapture(sniffer, sniff);
             stopSniff(sniff);
+            exit(0);
         }
 
 
@@ -219,19 +234,33 @@ class Connection {
             secondary.setLinkHeaderLen(LibPcapWrapper::getLinkHeaderLen(secondary_sniff));
             primary.setLinkHeaderLen(LibPcapWrapper::getLinkHeaderLen(primary_sniff));
 
-            LibPcapWrapper::pcapConn* primary_inject = LibPcapWrapper::openLiveConnection(primary, "");
-            LibPcapWrapper::pcapConn* secondary_inject = LibPcapWrapper::openLiveConnection(primary, "");
-
 
             std::vector<std::thread> threads;
-            // Create a thread for each device
-            threads.emplace_back(LibPcapWrapper::startPacketCapture, injector, primary_sniff);
-            threads.emplace_back(LibPcapWrapper::startPacketCapture, injector, secondary_sniff);
 
-            // thread prim_thread(&CaptureSession::startCapture, primary_session.get(), count);
-            // thread sec_thread(&CaptureSession::startCapture, primary_session.get(), count);
-            LibPcapWrapper::startPacketCapture(injector, conn);
-            stopSniff(conn);
+            // Start packet capture for primary connection
+            threads.emplace_back([primary_sniff, secondary]() {
+                LibPcapWrapper::startPacketCapture(injector, primary_sniff, secondary);
+            });
+
+            // Start packet capture for secondary connection
+            threads.emplace_back([secondary_sniff, primary]() {
+                LibPcapWrapper::startPacketCapture(injector, secondary_sniff, primary);
+            });
+
+            // Wait for both threads to complete
+            for (auto& t : threads) {
+                if (t.joinable()) {
+                    t.join();
+                }
+            }
+
+            // Stop sniffing on both connections
+            stopSniff(primary_sniff, primary);
+            stopSniff(secondary_sniff, secondary);
+            stopInject(primary, secondary)
+
+            exit(0);
+        }
     }
 };
 
@@ -240,10 +269,11 @@ int main(int argc, char* argv[]) {
   // global_app = &app; // Set the global application pointer for signal handling
 
   // Set up signal handlers
-  // signal(SIGINT, [](int signo) { if (global_app) global_app->stop(); });
-  // signal(SIGTERM, [](int signo) { if (global_app) global_app->stop(); });
-  // signal(SIGQUIT, [](int signo) { if (global_app) global_app->stop(); });
+  signal(SIGINT, [](int signo) { if (global_app) global_app->stop(); });
+  signal(SIGTERM, [](int signo) { if (global_app) global_app->stop(); });
+  signal(SIGQUIT, [](int signo) { if (global_app) global_app->stop(); });
   //
   // app.run(argc, argv);
   return 0;
 }
+
