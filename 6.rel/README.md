@@ -1,30 +1,29 @@
+Structural Design:
+
 ```plaintext
-+--------------------+
-|      Interface   |
-+--------------------+
-| - name             |
++----------------------------+
+|          Interface         |
++----------------------------+
+| - name                     |
 | - ip_stat<ip,(packet, byte)|
 | - injection_failure        |
-+--------------------+
-| + run(argc, argv)  |
-| + stop()           |
-| + parseArguments() |
-+--------------------+
++----------------------------+
+| + run(argc, argv)          |
+| + stop()                   |
+| + parseArguments()         |
++----------------------------+
          |
          v
 +----------------------+
-|   CaptureSession     |
+|      Connection      |
 +----------------------+
-| - interface_name     |
-| - sniff_handle       |
-| - packet_handler     |
-| - stop_flag          |
+| - primary            |
+| - secondary          |
 +----------------------+
-| + startCapture()     |
-| + stopCapture()      |
-| + getStats()         |
-| + getPacketHandler() |
+| + sniff()            |
+| + inject()           |
 +----------------------+
-```
 
-![[photo_2024-11-14_13-00-37.jpg]]
+
+(LibPcapWrapper)
+```
