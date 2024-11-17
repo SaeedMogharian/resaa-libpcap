@@ -80,6 +80,22 @@ class LibPcapWrapper {
                           << pcap_geterr(injection_handle.get()) << endl;
             }
         }
+
+        static u_char* packetCapture(pcapConn* conn){
+            struct pcap_pkthdr* header;
+            const u_char* packet = pcap_next(handle, header);
+            if (packet) {
+                cout << "Captured a packet with length:"<< header.len <<" bytes"<< endl;
+                return header.len;
+            } else {
+                cout << "Packet capture failed" << endl;
+                return -1;
+            }
+
+        }
+           // const u_char *pcap_next(pcap_t *p, struct pcap_pkthdr *h);
+           // int pcap_next_ex(pcap_t *p, struct pcap_pkthdr **pkt_header, const u_char **pkt_data);
+
         static pair<string, string> stopPacketCapture(pcapConn conn) {
               pcap_breakloop(conn);
               pair<string, string> stats_report;
@@ -205,6 +221,7 @@ class Connection {
                 << drop << " packets dropped" << endl << endl;
 
             interface->printIpStats();
+            pcap_close(conn);
         }
 
         static void stopInject(const Interface* prim, const Interface* secon) {
