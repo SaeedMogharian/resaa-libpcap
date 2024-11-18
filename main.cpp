@@ -40,7 +40,6 @@ class IpStats{
          */
         void consumePacket(Packet& packet)
         {
-            auto ipAdd = packet.getLayerOfType<IPv4Layer>()->getSrcIPAddress().getIPv4();
             // string ip = static_cast<string>(ipAdd);
             int packets_size = 0;
             // first let's go over the layers one by one and find out its type, its total length, its header length and its payload length
@@ -50,12 +49,13 @@ class IpStats{
             }
 
             // update
-            // if (ip_stats.find(ip) != ip_stats.end()) {
-            //     ip_stats[ip].first++; // Increment packets
-            //     ip_stats[ip].second += packets_size;  // Increment bytes
-            // } else {
-            //     ip_stats[ip] = make_pair(1, packets_size); // Initialize if not present
-            // }
+            string ip = packet.getLayerOfType<IPv4Layer>()->getSrcIPAddress().toString();
+            if (ip_stats.find(ip) != ip_stats.end()) {
+                ip_stats[ip].first++; // Increment packets
+                ip_stats[ip].second += packets_size;  // Increment bytes
+            } else {
+                ip_stats[ip] = make_pair(1, packets_size); // Initialize if not present
+            }
         }
         
         void clear(){
@@ -72,23 +72,30 @@ class IpStats{
 };
 
 
-struct injectionCookie {PcapLiveDevice* dev; IpStats* stats;};
+struct injectionCookie {
+    PcapLiveDevice* dev;
+    IpStats* stats;
 
-static void injection(RawPacket* packet, PcapLiveDevice* nic_prim, void* data){
-// extract the stats object form the cookie
-    struct injectionCookie * parsed_data = data; 
+    // Constructor to initialize the struct
+    injectionCookie(PcapLiveDevice* device, IpStats* statistics)
+        : dev(device), stats(statistics) {}
+};
+
+static void injection(RawPacket* packet, PcapLiveDevice* nic_prim, void* data) {
+    // Extract the stats object from the cookie
+    struct injectionCookie* parsed_data = static_cast<struct injectionCookie*>(data); 
     PcapLiveDevice* dst_dev = parsed_data->dev;
     IpStats* stats = parsed_data->stats;
 
-    // parsed the raw packet
+    // Parse the raw packet
     Packet parsedPacket(packet);
 
-    // collect stats from packet
+    // Collect stats from packet
     stats->consumePacket(parsedPacket);
 
     bool success = dst_dev->sendPacket(*packet);
-    if (!success){
-        cout << "Injection Faild on " << dst_dev->getName() << endl ;
+    if (!success) {
+        cout << "Injection Failed on " << dst_dev->getName() << endl;
     }
 }
 
@@ -145,19 +152,19 @@ int main(int argc, char* argv[])
     getDevInfo(secondary);
 
     // Using filters
-    PortFilter portFilter(80, SRC_OR_DST);
+    // PortFilter portFilter(80, SRC_OR_DST);
 
-	// create a filter instance to capture only TCP traffic
-	ProtoFilter protocolFilter(TCP);
+	// // create a filter instance to capture only TCP traffic
+	// ProtoFilter protocolFilter(TCP);
 
-	// create an AND filter to combine both filters - capture only TCP traffic on port 80
-	AndFilter andFilter;
-	andFilter.addFilter(&portFilter);
-	andFilter.addFilter(&protocolFilter);
+	// // create an AND filter to combine both filters - capture only TCP traffic on port 80
+	// AndFilter andFilter;
+	// andFilter.addFilter(&portFilter);
+	// andFilter.addFilter(&protocolFilter);
 
-	// set the filter on the device
-	primary->setFilter(andFilter);
-    secondary->setFilter(andFilter);
+	// // set the filter on the device
+	// primary->setFilter(andFilter);
+    // secondary->setFilter(andFilter);
 
 
     // IpStats
@@ -171,8 +178,11 @@ int main(int argc, char* argv[])
 
 	// start capture in async mode. Give a callback function to call to whenever a packet is captured and the stats
 	// object as the cookie
-	primary->startCapture(injection, injectionCookie(&secondary, &prim_stats));
-    secondary->startCapture(injection, injectionCookie(&primary, &secn_stats));
+    auto* pi = new injectionCookie(secondary, &prim_stats);
+    auto* si = new injectionCookie(primary, &secn_stats);
+
+    primary->startCapture(injection, pi);
+    secondary->startCapture(injection, si);
 
 	// sleep for 10 seconds in main thread, in the meantime packets are captured in the async thread
 	multiPlatformSleep(10);
@@ -182,13 +192,13 @@ int main(int argc, char* argv[])
     secondary->stopCapture();
 
     // stop capturing packets
-	prim_stats.print();
-    secn_stats.print();
+	prim_stats.print(primary->getName());
+    secn_stats.print(secondary->getName());
 
 
 	// clear stats
-	prim_stats->clear();
-    secn_stats->clear();
+	prim_stats.clear();
+    secn_stats.clear();
 
 
 }
