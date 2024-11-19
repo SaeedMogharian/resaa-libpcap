@@ -4,6 +4,7 @@
 #include <algorithm>
 #include "stdlib.h"
 #include "PcapLiveDeviceList.h"
+#include "PcapLiveDevice.h"
 #include "SystemUtils.h"
 #include "IPv4Layer.h"
 #include <utility>
@@ -49,7 +50,13 @@ class IpStats{
             }
 
             // update
-            string ip = packet.getLayerOfType<IPv4Layer>()->getSrcIPAddress().toString();
+            IPv4Layer* ipv4Layer = packet.getLayerOfType<IPv4Layer>();
+            if (ipv4Layer == nullptr) {
+                // cerr << "Packet does not contain an IPv4 layer." << endl;
+                return;
+            }
+            string ip = ipv4Layer->getSrcIPAddress().toString();
+
             if (ip_stats.find(ip) != ip_stats.end()) {
                 ip_stats[ip].first++; // Increment packets
                 ip_stats[ip].second += packets_size;  // Increment bytes
@@ -145,11 +152,11 @@ int main(int argc, char* argv[])
 {
 	// find the interface by IP address
     // PcapLiveDevice 
-	auto* primary = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByName("ens160");	
-    auto* secondary = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByName("ens192");	
-	
-    getDevInfo(primary);
-    getDevInfo(secondary);
+	auto* primary_sniff = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByName("ens160");	
+    auto* secondary_sniff = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByName("ens192");
+    
+    getDevInfo(primary_sniff);
+    getDevInfo(secondary_sniff);
 
     // Using filters
     // PortFilter portFilter(80, SRC_OR_DST);
@@ -163,8 +170,8 @@ int main(int argc, char* argv[])
 	// andFilter.addFilter(&protocolFilter);
 
 	// // set the filter on the device
-	// primary->setFilter(andFilter);
-    // secondary->setFilter(andFilter);
+	// primary_sniff->setFilter(andFilter);
+    // secondary_sniff->setFilter(andFilter);
 
 
     // IpStats
@@ -177,23 +184,25 @@ int main(int argc, char* argv[])
 	cout << endl << "Starting async capture..." << endl;
 
 	// start capture in async mode. Give a callback function to call to whenever a packet is captured and the stats
-	// object as the cookie
-    auto* pi = new injectionCookie(secondary, &prim_stats);
-    auto* si = new injectionCookie(primary, &secn_stats);
+	// object as the cookie	
+    auto* pi = new injectionCookie(secondary_sniff, &prim_stats);
+    auto* si = new injectionCookie(primary_sniff, &secn_stats);
 
-    primary->startCapture(injection, pi);
-    secondary->startCapture(injection, si);
+    primary_sniff->startCapture(injection, pi);
+    secondary_sniff->startCapture(injection, si);
 
 	// sleep for 10 seconds in main thread, in the meantime packets are captured in the async thread
 	multiPlatformSleep(10);
 
 	// stop capturing packets
-	primary->stopCapture();
-    secondary->stopCapture();
+	primary_sniff->stopCapture();
+    secondary_sniff->stopCapture();
+    primary_sniff->close();
+    secondary_sniff->close();
 
     // stop capturing packets
-	prim_stats.print(primary->getName());
-    secn_stats.print(secondary->getName());
+	prim_stats.print(primary_sniff->getName());
+    secn_stats.print(secondary_sniff->getName());
 
 
 	// clear stats
