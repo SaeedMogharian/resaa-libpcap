@@ -115,31 +115,7 @@ static void injection(RawPacket *packet, PcapLiveDevice *nic_prim, void *data) {
     }
 }
 
-void getDevInfo(PcapLiveDevice *conn) {
-    if (conn == nullptr) {
-        cerr << "Cannot find interface with name of '" << conn->getName() << "'" << endl;
-        exit(1);
-    }
-
-    cout << "Interface info:" << endl
-         << "   Interface name:        " << conn->getName() << endl
-         << "   Interface description: " << conn->getDesc() << endl
-         << "   MAC address:           " << conn->getMacAddress() << endl
-         << "   Default gateway:       " << conn->getDefaultGateway() << endl
-         << "   Interface MTU:         " << conn->getMtu() << endl;
-
-    if (!conn->getDnsServers().empty()) {
-        cout << "   DNS server:            " << conn->getDnsServers().front() << endl;
-    }
-
-    if (!conn->open()) {
-        cerr << "Cannot open device" << endl;
-        exit(1);
-    }
-}
-
 bool keepRunning = true;
-
 void signalHandler(int signum) {
     cout << "  Stopping..." << endl;
     keepRunning = false;
@@ -170,14 +146,32 @@ int main(int argc, char *argv[]) {
             filter += arg + " ";
         }
     }
+    if (interface_secn.empty() || interface_prim.empty()) {
+        cerr << "Interface not specified!" << endl;
+        return 1;
+    }
 
     auto *primary = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByName(interface_prim);
     auto *secondary = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByName(interface_secn);
 
-    getDevInfo(primary);
-    getDevInfo(secondary);
+    if (primary == nullptr) {
+        cerr << "Cannot find interface with name of '" << primary->getName() << "'" << endl;
+        exit(1);
+    }
+    if (!primary->open()) {
+        cerr << "Cannot open device" << primary.getName() << endl;
+        exit(1);
+    }
+    if (secondary == nullptr) {
+        cerr << "Cannot find interface with name of '" << secondary->getName() << "'" << endl;
+        exit(1);
+    }
+    if (!secondary->open()) {
+        cerr << "Cannot open device" << secondary.getName() << endl;
+        exit(1);
+    }
 
-    filter += "inbound";
+    filter += " inbound";
 
     if (!primary->setFilter(filter) || !secondary->setFilter(filter)) {
         cerr << "Failed to set filter on interface" << endl;
@@ -191,9 +185,10 @@ int main(int argc, char *argv[]) {
     primary->startCapture(injection, pi);
     secondary->startCapture(injection, si);
 
-    cout << endl << "Starting async capture. Press ^C to stop..." << endl;
-
+    
     while (keepRunning) {
+        cout << endl << "Async capture&inject. Press ^C to stop..." << endl;
+
         multiPlatformSleep(1);
         {
             std::lock_guard<std::mutex> lock(statsMutex);
