@@ -8,6 +8,7 @@
 #include "SystemUtils.h"
 #include "IPv4Layer.h"
 #include <utility>
+#include <csignal>
 
 
 using namespace std;
@@ -15,12 +16,13 @@ using namespace std;
 using namespace pcpp;
 
 
-class IpStats{
+class Stats{
     private:
         unordered_map<string, pair<int, int>> ip_stats;
+        int injection_failure = 0;
     public:
 
-         void print(string name) const {
+         void printIpStats(string name) const {
             cout << "\nIP Statistics On Interface: " << name << endl;
 
             cout << left << setw(17) << "IP"
@@ -33,11 +35,18 @@ class IpStats{
                      << setw(15) << entry.second.first
                      << setw(12) << entry.second.second << endl;
             }
+
+            if (ip_stats.empty()){
+                cout << left
+                     << setw(17) << "-"
+                     << setw(15) << "-"
+                     << setw(12) << "-" << endl;
+            }
         }
         // Update both packet and byte counts for a specific IP address
-    
         /**
          * Collect stats from a packet
+         * only IPv4 packets are considered.
          */
         void consumePacket(Packet& packet)
         {
@@ -65,7 +74,7 @@ class IpStats{
             }
         }
         
-        void clear(){
+        void clearIpStats(){
             ip_stats.clear();
         }
         int getPacketsCount() const {
@@ -76,23 +85,38 @@ class IpStats{
             return totalPackets;
         }
 
-};
+        void increaseInjectionFailure(){
+            injection_failure++;
+        }
 
+        void printInjectionFailure(string name){
+            int pckt_cnt = getPacketsCount();
+            cout << left
+              << setw(22) << name
+              << setw(21) << pckt_cnt
+              << setw(10) << injection_failure
+              << (pckt_cnt > 0
+                  ? (100.0 * (pckt_cnt - injection_failure) / pckt_cnt)
+                  : 0.0)
+              << endl;
+        }
+};
 
 struct injectionCookie {
     PcapLiveDevice* dev;
-    IpStats* stats;
+    Stats* stats;
 
     // Constructor to initialize the struct
-    injectionCookie(PcapLiveDevice* device, IpStats* statistics)
+    injectionCookie(PcapLiveDevice* device, Stats* statistics)
         : dev(device), stats(statistics) {}
 };
 
+// callback function for injection handling
 static void injection(RawPacket* packet, PcapLiveDevice* nic_prim, void* data) {
     // Extract the stats object from the cookie
     struct injectionCookie* parsed_data = static_cast<struct injectionCookie*>(data); 
     PcapLiveDevice* dst_dev = parsed_data->dev;
-    IpStats* stats = parsed_data->stats;
+    Stats* stats = parsed_data->stats;
 
     // Parse the raw packet
     Packet parsedPacket(packet);
@@ -103,10 +127,9 @@ static void injection(RawPacket* packet, PcapLiveDevice* nic_prim, void* data) {
     bool success = dst_dev->sendPacket(*packet);
     if (!success) {
         cout << "Injection Failed on " << dst_dev->getName() << endl;
+        stats->increaseInjectionFailure();
     }
 }
-
-
 
 void getDevInfo(PcapLiveDevice* conn){
     if (conn == nullptr)
@@ -142,73 +165,104 @@ void getDevInfo(PcapLiveDevice* conn){
 };
 
 
+bool keepRunning = true;
+void signalHandler(int signum) {
+    cout << "  Stopping..." << endl;
+    keepRunning = false;
+}
+
 
 /**
  * main method of the application
  */
-
-
 int main(int argc, char* argv[])
 {
-	// find the interface by IP address
+
+    signal(SIGINT, signalHandler);
+
+    string interface_prim = "";
+    string interface_secn = "";
+    string filter = "";
+
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+
+        if (arg == "-i" && i + 1 < argc) {
+            interface_prim = argv[++i];
+        } else if (arg == "-j" && i + 1 < argc) {
+            interface_secn = argv[++i];
+        } else if (arg == "-h") {
+            cout << "Usage: " << argv[0]
+                      << " [-h] [-i primary_interface] [-j secondary_interface] [BPF filter]" << endl;
+            exit(0);
+        } else if (!arg.empty() && arg[0] == '-') {
+            cerr << "Unknown option: " << arg << endl;
+            exit(1);
+        } else {
+            filter += arg + " ";
+        }
+    }
+
     // PcapLiveDevice 
-	auto* primary_sniff = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByName("ens160");	
-    auto* secondary_sniff = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByName("ens192");
+	auto* primary = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByName(interface_prim);	
+    auto* secondary = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByName(interface_secn);
     
-    getDevInfo(primary_sniff);
-    getDevInfo(secondary_sniff);
-
-    // Using filters
-    // PortFilter portFilter(80, SRC_OR_DST);
-
-	// // create a filter instance to capture only TCP traffic
-	// ProtoFilter protocolFilter(TCP);
-
-	// // create an AND filter to combine both filters - capture only TCP traffic on port 80
-	// AndFilter andFilter;
-	// andFilter.addFilter(&portFilter);
-	// andFilter.addFilter(&protocolFilter);
-    string filter = "inbound";
+    getDevInfo(primary);
+    getDevInfo(secondary);
+    
+    filter += "inbound";
 
 	// set the filter on the device
-	primary_sniff->setFilter(filter);
-    secondary_sniff->setFilter(filter);
+	if (!primary->setFilter(filter)) {
+        cerr << "Failed to set filter on interface" << endl;
+        return;
+    }
+    if (!secondary->setFilter(filter)) {
+        cerr << "Failed to set filter on interface" << endl;
+        return;
+    }
 
 
-    // IpStats
-    IpStats prim_stats;
-    IpStats secn_stats;
+    // Stats
+    Stats prim_stats;
+    Stats secn_stats;
 
 	// Async packet capture with a callback function
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-	cout << endl << "Starting async capture..." << endl;
-
+	cout << endl << "Starting async capture. Press ^C to stop..." << endl;
 	// start capture in async mode. Give a callback function to call to whenever a packet is captured and the stats
 	// object as the cookie	
-    auto* pi = new injectionCookie(secondary_sniff, &prim_stats);
-    auto* si = new injectionCookie(primary_sniff, &secn_stats);
-
-    primary_sniff->startCapture(injection, pi);
-    secondary_sniff->startCapture(injection, si);
-
+    auto* pi = new injectionCookie(secondary, &prim_stats);
+    auto* si = new injectionCookie(primary, &secn_stats);
+    primary->startCapture(injection, pi);
+    secondary->startCapture(injection, si);
 	// sleep for 10 seconds in main thread, in the meantime packets are captured in the async thread
-	multiPlatformSleep(10);
-
+	while (keepRunning) {
+        multiPlatformSleep(1);
+    }
 	// stop capturing packets
-	primary_sniff->stopCapture();
-    secondary_sniff->stopCapture();
-    primary_sniff->close();
-    secondary_sniff->close();
+	primary->stopCapture();
+    secondary->stopCapture();
+    primary->close();
+    secondary->close();
 
-    // stop capturing packets
-	prim_stats.print(primary_sniff->getName());
-    secn_stats.print(secondary_sniff->getName());
+    // stop caturing packets
+	prim_stats.printIpStats(primary->getName());
+    secn_stats.printIpStats(secondary->getName());
+
+    cout << endl << "Injection Statistics Report:" << endl;
+    cout << left
+        << setw(22) << "ReceivedOnInterface"
+        << setw(21) << "PacketsInjectedFrom"
+        << setw(10) << "Failures"
+        << "SuccessRate (%)" << endl;
+    prim_stats.printInjectionFailure(primary->getName());
+    secn_stats.printInjectionFailure(secondary->getName());
 
 
-	// clear stats
-	prim_stats.clear();
-    secn_stats.clear();
+	// clearIpStats stats
+	prim_stats.clearIpStats();
+    secn_stats.clearIpStats();
 
 
 }
