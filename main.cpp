@@ -168,10 +168,11 @@ int main(int argc, char* argv[])
 	// AndFilter andFilter;
 	// andFilter.addFilter(&portFilter);
 	// andFilter.addFilter(&protocolFilter);
+    string filter = "inbound";
 
-	// // set the filter on the device
-	// primary_sniff->setFilter(andFilter);
-    // secondary_sniff->setFilter(andFilter);
+	// set the filter on the device
+	primary_sniff->setFilter(filter);
+    secondary_sniff->setFilter(filter);
 
 
     // IpStats
