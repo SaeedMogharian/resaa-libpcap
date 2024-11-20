@@ -91,18 +91,10 @@ public:
     }
 };
 
-struct injectionCookie {
-    PcapLiveDevice *dev;
-    Stats *stats;
-
-    injectionCookie(PcapLiveDevice *device, Stats *statistics)
-        : dev(device), stats(statistics) {}
-};
-
 static void injection(RawPacket *packet, PcapLiveDevice *nic_prim, void *data) {
-    auto *parsed_data = static_cast<injectionCookie *>(data);
-    PcapLiveDevice *dst_dev = parsed_data->dev;
-    Stats *stats = parsed_data->stats;
+    auto *parsed_data = static_cast<pair<PcapLiveDevice *, Stats *> *>(data); // Use std::pair
+    PcapLiveDevice *dst_dev = parsed_data->first;
+    Stats *stats = parsed_data->second;
 
     Packet parsedPacket(packet);
     stats->consumePacket(parsedPacket);
@@ -121,12 +113,23 @@ void signalHandler(int signum) {
     keepRunning = false;
 }
 
+void checkDev(PcapLiveDevice* dev){
+    if (dev == nullptr) {
+        cerr << "Cannot find interface with name of '" << dev->getName() << "'" << endl;
+        exit(1);
+    }
+    if (!dev->open()) {
+        cerr << "Cannot open device" << dev->getName() << endl;
+        exit(1);
+    }
+}
+
 int main(int argc, char *argv[]) {
     signal(SIGINT, signalHandler);
 
     string interface_prim = "";
     string interface_secn = "";
-    string filter = "";
+    string filter = "inbound ";
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -154,24 +157,9 @@ int main(int argc, char *argv[]) {
     auto *primary = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByName(interface_prim);
     auto *secondary = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByName(interface_secn);
 
-    if (primary == nullptr) {
-        cerr << "Cannot find interface with name of '" << primary->getName() << "'" << endl;
-        exit(1);
-    }
-    if (!primary->open()) {
-        cerr << "Cannot open device" << primary.getName() << endl;
-        exit(1);
-    }
-    if (secondary == nullptr) {
-        cerr << "Cannot find interface with name of '" << secondary->getName() << "'" << endl;
-        exit(1);
-    }
-    if (!secondary->open()) {
-        cerr << "Cannot open device" << secondary.getName() << endl;
-        exit(1);
-    }
-
-    filter += " inbound";
+    
+    checkDev(primary);
+    checkDev(secondary);
 
     if (!primary->setFilter(filter) || !secondary->setFilter(filter)) {
         cerr << "Failed to set filter on interface" << endl;
@@ -179,8 +167,9 @@ int main(int argc, char *argv[]) {
     }
 
     Stats prim_stats, secn_stats;
-    auto *pi = new injectionCookie(secondary, &prim_stats);
-    auto *si = new injectionCookie(primary, &secn_stats);
+    // Replace injectionCookie with std::pair
+    auto pi = new pair<PcapLiveDevice *, Stats *>(secondary, &prim_stats);
+    auto si = new pair<PcapLiveDevice *, Stats *>(primary, &secn_stats);
 
     primary->startCapture(injection, pi);
     secondary->startCapture(injection, si);

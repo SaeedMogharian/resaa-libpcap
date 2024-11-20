@@ -91,36 +91,10 @@ public:
     }
 };
 
-struct injectionCookie {
-    PcapLiveDevice *dev;
-    Stats *stats;
-    bool change_ip = 0;
-
-    injectionCookie(PcapLiveDevice *device, Stats *statistics, bool ipFlag)
-        : dev(device), stats(statistics), change_ip(ipFlag) {}
-};
-
-void modifyPacketIP(Packet &packet, PcapLiveDevice* newDev) {
-    // Retrieve the IPv4 layer
-    IPv4Layer *ipv4Layer = packet.getLayerOfType<IPv4Layer>();
-    if (ipv4Layer == nullptr) {
-        return;
-    }
-
-    // Change the source and destination IP addresses
-    ipv4Layer->setDstIPv4Address(IPv4Address(newDev->getIPv4Address()));
-
-    // Recalculate the checksum and other fields
-    ipv4Layer->computeCalculateFields();
-
-    // cout << "Packet modified: Source IP = " << newSrcIP
-    //      << ", Destination IP = " << newDstIP << endl;
-}
-
 static void injection(RawPacket *packet, PcapLiveDevice *nic_prim, void *data) {
-    auto *parsed_data = static_cast<injectionCookie *>(data);
-    PcapLiveDevice *dst_dev = parsed_data->dev;
-    Stats *stats = parsed_data->stats;
+    auto *parsed_data = static_cast<pair<PcapLiveDevice *, Stats *> *>(data); // Use std::pair
+    PcapLiveDevice *dst_dev = parsed_data->first;
+    Stats *stats = parsed_data->second;
 
     Packet parsedPacket(packet);
     IPv4Layer *ipv4Layer = parsedPacket.getLayerOfType<IPv4Layer>();
@@ -129,21 +103,12 @@ static void injection(RawPacket *packet, PcapLiveDevice *nic_prim, void *data) {
     }
 
     stats->consumePacket(parsedPacket);
+    
+    // Change IP
+    ipv4Layer->setDstIPv4Address(IPv4Address(dst_dev->getIPv4Address()));
+    ipv4Layer->computeCalculateFields();
 
-    bool change = parsed_data->change_ip;
-    if (change){
-
-        // cout << ipv4Layer->getDstIPAddress() << endl;
-
-        // / Change the source and destination IP addresses
-        ipv4Layer->setDstIPv4Address(IPv4Address(dst_dev->getIPv4Address()));
-
-        // Recalculate the checksum and other fields
-        ipv4Layer->computeCalculateFields();
-
-        // cout << ipv4Layer->getDstIPAddress() << endl;
-    }
-
+    // Injecting On destination dev
     bool success = dst_dev->sendPacket(*packet);
     if (!success) {
         std::lock_guard<std::mutex> lock(statsMutex); // Protect the output
@@ -158,14 +123,23 @@ void signalHandler(int signum) {
     keepRunning = false;
 }
 
+void checkDev(PcapLiveDevice* dev){
+    if (dev == nullptr) {
+        cerr << "Cannot find interface with name of '" << dev->getName() << "'" << endl;
+        exit(1);
+    }
+    if (!dev->open()) {
+        cerr << "Cannot open device" << dev->getName() << endl;
+        exit(1);
+    }
+}
+
 int main(int argc, char *argv[]) {
     signal(SIGINT, signalHandler);
 
     string interface_prim = "";
     string interface_secn = "";
-    string filter = "";
-
-    bool change_ip = 0;
+    string filter = "inbound ";
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -174,8 +148,6 @@ int main(int argc, char *argv[]) {
             interface_prim = argv[++i];
         } else if (arg == "-j" && i + 1 < argc) {
             interface_secn = argv[++i];
-        } else if (arg == "-c") {
-            change_ip = 1;
         } else if (arg == "-h") {
             cout << "Usage: " << argv[0]
                  << " [-h] [-i primary_interface] [-j secondary_interface] [BPF filter]" << endl;
@@ -195,36 +167,18 @@ int main(int argc, char *argv[]) {
     auto *primary = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByName(interface_prim);
     auto *secondary = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByName(interface_secn);
 
-    if (primary == nullptr) {
-        cerr << "Cannot find interface with name of '" << primary->getName() << "'" << endl;
-        exit(1);
-    }
-    if (!primary->open()) {
-        cerr << "Cannot open device" << primary->getName() << endl;
-        exit(1);
-    }
-    if (secondary == nullptr) {
-        cerr << "Cannot find interface with name of '" << secondary->getName() << "'" << endl;
-        exit(1);
-    }
-    if (!secondary->open()) {
-        cerr << "Cannot open device" << secondary->getName() << endl;
-        exit(1);
-    }
-
-    filter += " inbound";
+    checkDev(primary);
+    checkDev(secondary);
 
     if (!primary->setFilter(filter) || !secondary->setFilter(filter)) {
         cerr << "Failed to set filter on interface" << endl;
         return 1;
     }
 
-    Stats prim_stats, secn_stats;
-    auto *pi = new injectionCookie(secondary, &prim_stats, change_ip);
-    // auto *si = new injectionCookie(primary, &secn_stats, change_ip);
+    Stats prim_stats;
+    auto *pi = new pair<PcapLiveDevice *, Stats *>(secondary, &prim_stats);
 
     primary->startCapture(injection, pi);
-    // secondary->startCapture(injection, si);
 
     
     while (keepRunning) {
@@ -238,7 +192,6 @@ int main(int argc, char *argv[]) {
             // Print IP stats for both interfaces
             cout << "Live Statistics Report:" << endl;
             prim_stats.printIpStats(primary->getName());
-            // secn_stats.printIpStats(secondary->getName());
 
             // Print Injection statistics
             cout << endl << "Injection Statistics:" << endl;
@@ -248,15 +201,12 @@ int main(int argc, char *argv[]) {
                  << setw(10) << "Failures"
                  << "SuccessRate (%)" << endl;
             prim_stats.printInjectionFailure(primary->getName());
-            // secn_stats.printInjectionFailure(secondary->getName());
         }
     }
 
     primary->stopCapture();
-    // secondary->stopCapture();
     primary->close();
     secondary->close();
 
     prim_stats.clearIpStats();
-    secn_stats.clearIpStats();
 }
