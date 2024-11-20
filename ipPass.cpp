@@ -221,10 +221,10 @@ int main(int argc, char *argv[]) {
 
     Stats prim_stats, secn_stats;
     auto *pi = new injectionCookie(secondary, &prim_stats, change_ip);
-    auto *si = new injectionCookie(primary, &secn_stats, change_ip);
+    // auto *si = new injectionCookie(primary, &secn_stats, change_ip);
 
     primary->startCapture(injection, pi);
-    secondary->startCapture(injection, si);
+    // secondary->startCapture(injection, si);
 
     
     while (keepRunning) {
@@ -238,7 +238,7 @@ int main(int argc, char *argv[]) {
             // Print IP stats for both interfaces
             cout << "Live Statistics Report:" << endl;
             prim_stats.printIpStats(primary->getName());
-            secn_stats.printIpStats(secondary->getName());
+            // secn_stats.printIpStats(secondary->getName());
 
             // Print Injection statistics
             cout << endl << "Injection Statistics:" << endl;
@@ -248,12 +248,12 @@ int main(int argc, char *argv[]) {
                  << setw(10) << "Failures"
                  << "SuccessRate (%)" << endl;
             prim_stats.printInjectionFailure(primary->getName());
-            secn_stats.printInjectionFailure(secondary->getName());
+            // secn_stats.printInjectionFailure(secondary->getName());
         }
     }
 
     primary->stopCapture();
-    secondary->stopCapture();
+    // secondary->stopCapture();
     primary->close();
     secondary->close();
 
