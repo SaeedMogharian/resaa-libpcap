@@ -133,7 +133,7 @@ static void injection(RawPacket *packet, PcapLiveDevice *nic_prim, void *data) {
     bool change = parsed_data->change_ip;
     if (change){
 
-        cout << ipv4Layer->getDstIPAddress() << endl;
+        // cout << ipv4Layer->getDstIPAddress() << endl;
 
         // / Change the source and destination IP addresses
         ipv4Layer->setDstIPv4Address(IPv4Address(dst_dev->getIPv4Address()));
@@ -141,7 +141,7 @@ static void injection(RawPacket *packet, PcapLiveDevice *nic_prim, void *data) {
         // Recalculate the checksum and other fields
         ipv4Layer->computeCalculateFields();
 
-        cout << ipv4Layer->getDstIPAddress() << endl;
+        // cout << ipv4Layer->getDstIPAddress() << endl;
     }
 
     bool success = dst_dev->sendPacket(*packet);
