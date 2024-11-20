@@ -6,8 +6,8 @@ CXXFLAGS = `PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags PcapPlusPlus`
 LDFLAGS = `PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs PcapPlusPlus`
 
 # Targets
-TARGET = zojaj
-SRC = main.cpp
+TARGET = ipPass
+SRC = ipPass.cpp
 OBJ = $(SRC:.cpp=.o)
 
 # Rules
