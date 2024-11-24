@@ -66,3 +66,15 @@ clone from: https://github.com/seladb/PcapPlusPlus
 - shallow clone (repo is too big!): `git clone --depth 1 https://github.com/seladb/PcapPlusPlus.git`
 
 build using doc: https://pcapplusplus.github.io/docs/install/linux
+
+
+
+
+## Code
+### Wire
+Capture and Inject Bidirectionally on 2 interfaces.
+
+### ip-redirector
+One-way capture and inject. change each packet destination IP to the target interface ip.
+
+
