@@ -1,3 +1,0 @@
-/root/projects/resaa-transparent-node/CMakeFiles/ipPass.dir
-/root/projects/resaa-transparent-node/CMakeFiles/edit_cache.dir
-/root/projects/resaa-transparent-node/CMakeFiles/rebuild_cache.dir
