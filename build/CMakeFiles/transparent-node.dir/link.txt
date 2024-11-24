@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/transparent-node.dir/src/wire.cpp.o -o transparent-node  -lPacket++ -lPcap++ -lCommon++ /usr/lib/x86_64-linux-gnu/libpcap.so 
