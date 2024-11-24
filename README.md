@@ -71,7 +71,7 @@ build using doc: https://pcapplusplus.github.io/docs/install/linux
 
 
 ## Code
-### Wire
+### wire
 Capture and Inject Bidirectionally on 2 interfaces.
 
 ### ip-redirector
