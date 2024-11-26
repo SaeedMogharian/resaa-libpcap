@@ -59,3 +59,22 @@ https://pcapplusplus.github.io/docs/features
 
 download and get it in project directory:
 https://github.com/seladb/PcapPlusPlus/releases/download/v24.09/pcapplusplus-24.09-ubuntu-22.04-gcc-11.4.0-x86_64.tar.gz
+
+
+build:
+clone from: https://github.com/seladb/PcapPlusPlus
+- shallow clone (repo is too big!): `git clone --depth 1 https://github.com/seladb/PcapPlusPlus.git`
+
+build using doc: https://pcapplusplus.github.io/docs/install/linux
+
+
+
+
+## Code
+### wire
+Capture and Inject Bidirectionally on 2 interfaces.
+
+### ip-redirector
+One-way capture and inject. change each packet destination IP to the target interface ip.
+
+
