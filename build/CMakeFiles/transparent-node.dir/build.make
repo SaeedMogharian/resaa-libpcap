@@ -69,29 +69,35 @@ include CMakeFiles/transparent-node.dir/progress.make
 # Include the compile flags for this target's objects.
 include CMakeFiles/transparent-node.dir/flags.make
 
-CMakeFiles/transparent-node.dir/src/wire.cpp.o: CMakeFiles/transparent-node.dir/flags.make
-CMakeFiles/transparent-node.dir/src/wire.cpp.o: ../src/wire.cpp
-CMakeFiles/transparent-node.dir/src/wire.cpp.o: CMakeFiles/transparent-node.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/root/projects/resaa-transparent-node/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/transparent-node.dir/src/wire.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/transparent-node.dir/src/wire.cpp.o -MF CMakeFiles/transparent-node.dir/src/wire.cpp.o.d -o CMakeFiles/transparent-node.dir/src/wire.cpp.o -c /root/projects/resaa-transparent-node/src/wire.cpp
+CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.o: CMakeFiles/transparent-node.dir/flags.make
+CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.o: ../src/ip-redirector.cpp
+CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.o: CMakeFiles/transparent-node.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/root/projects/resaa-transparent-node/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.o -MF CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.o.d -o CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.o -c /root/projects/resaa-transparent-node/src/ip-redirector.cpp
 
-CMakeFiles/transparent-node.dir/src/wire.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/transparent-node.dir/src/wire.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /root/projects/resaa-transparent-node/src/wire.cpp > CMakeFiles/transparent-node.dir/src/wire.cpp.i
+CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /root/projects/resaa-transparent-node/src/ip-redirector.cpp > CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.i
 
-CMakeFiles/transparent-node.dir/src/wire.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/transparent-node.dir/src/wire.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /root/projects/resaa-transparent-node/src/wire.cpp -o CMakeFiles/transparent-node.dir/src/wire.cpp.s
+CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /root/projects/resaa-transparent-node/src/ip-redirector.cpp -o CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.s
 
 # Object files for target transparent-node
 transparent__node_OBJECTS = \
-"CMakeFiles/transparent-node.dir/src/wire.cpp.o"
+"CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.o"
 
 # External object files for target transparent-node
 transparent__node_EXTERNAL_OBJECTS =
 
-transparent-node: CMakeFiles/transparent-node.dir/src/wire.cpp.o
+transparent-node: CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.o
 transparent-node: CMakeFiles/transparent-node.dir/build.make
+transparent-node: /usr/local/lib/libPcap++.a
+transparent-node: /usr/local/lib/libPcap++.a
+transparent-node: /usr/local/lib/libCommon++.a
+transparent-node: /usr/lib/x86_64-linux-gnu/libpcap.so
+transparent-node: /usr/local/lib/libPacket++.a
+transparent-node: /usr/local/lib/libCommon++.a
 transparent-node: /usr/lib/x86_64-linux-gnu/libpcap.so
 transparent-node: CMakeFiles/transparent-node.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/root/projects/resaa-transparent-node/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable transparent-node"

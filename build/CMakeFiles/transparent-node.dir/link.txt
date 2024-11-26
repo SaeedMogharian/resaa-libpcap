@@ -1,1 +1,1 @@
-/usr/bin/c++ CMakeFiles/transparent-node.dir/src/wire.cpp.o -o transparent-node  -lPacket++ -lPcap++ -lCommon++ /usr/lib/x86_64-linux-gnu/libpcap.so 
+/usr/bin/c++ CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.o -o transparent-node  /usr/local/lib/libPcap++.a /usr/local/lib/libPcap++.a /usr/local/lib/libCommon++.a /usr/lib/x86_64-linux-gnu/libpcap.so -lpthread -lpthread /usr/local/lib/libPacket++.a /usr/local/lib/libCommon++.a /usr/lib/x86_64-linux-gnu/libpcap.so 

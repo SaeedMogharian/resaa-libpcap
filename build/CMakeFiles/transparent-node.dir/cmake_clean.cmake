@@ -1,6 +1,6 @@
 file(REMOVE_RECURSE
-  "CMakeFiles/transparent-node.dir/src/wire.cpp.o"
-  "CMakeFiles/transparent-node.dir/src/wire.cpp.o.d"
+  "CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.o"
+  "CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.o.d"
   "transparent-node"
   "transparent-node.pdb"
 )

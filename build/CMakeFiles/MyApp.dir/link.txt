@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/MyApp.dir/ip-redirector.cpp.o -o MyApp  -lPcapPlusPlus::PcapPlusPlus 

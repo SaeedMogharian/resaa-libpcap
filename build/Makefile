@@ -129,29 +129,29 @@ transparent-node/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/transparent-node.dir/build.make CMakeFiles/transparent-node.dir/build
 .PHONY : transparent-node/fast
 
-src/wire.o: src/wire.cpp.o
-.PHONY : src/wire.o
+src/ip-redirector.o: src/ip-redirector.cpp.o
+.PHONY : src/ip-redirector.o
 
 # target to build an object file
-src/wire.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/transparent-node.dir/build.make CMakeFiles/transparent-node.dir/src/wire.cpp.o
-.PHONY : src/wire.cpp.o
+src/ip-redirector.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/transparent-node.dir/build.make CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.o
+.PHONY : src/ip-redirector.cpp.o
 
-src/wire.i: src/wire.cpp.i
-.PHONY : src/wire.i
+src/ip-redirector.i: src/ip-redirector.cpp.i
+.PHONY : src/ip-redirector.i
 
 # target to preprocess a source file
-src/wire.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/transparent-node.dir/build.make CMakeFiles/transparent-node.dir/src/wire.cpp.i
-.PHONY : src/wire.cpp.i
+src/ip-redirector.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/transparent-node.dir/build.make CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.i
+.PHONY : src/ip-redirector.cpp.i
 
-src/wire.s: src/wire.cpp.s
-.PHONY : src/wire.s
+src/ip-redirector.s: src/ip-redirector.cpp.s
+.PHONY : src/ip-redirector.s
 
 # target to generate assembly for a file
-src/wire.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/transparent-node.dir/build.make CMakeFiles/transparent-node.dir/src/wire.cpp.s
-.PHONY : src/wire.cpp.s
+src/ip-redirector.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/transparent-node.dir/build.make CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.s
+.PHONY : src/ip-redirector.cpp.s
 
 # Help Target
 help:
@@ -162,9 +162,9 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... transparent-node"
-	@echo "... src/wire.o"
-	@echo "... src/wire.i"
-	@echo "... src/wire.s"
+	@echo "... src/ip-redirector.o"
+	@echo "... src/ip-redirector.i"
+	@echo "... src/ip-redirector.s"
 .PHONY : help
 
 

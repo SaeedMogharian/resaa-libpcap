@@ -8,7 +8,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/root/projects/resaa-transparent-node/src/wire.cpp" "CMakeFiles/transparent-node.dir/src/wire.cpp.o" "gcc" "CMakeFiles/transparent-node.dir/src/wire.cpp.o.d"
+  "/root/projects/resaa-transparent-node/src/ip-redirector.cpp" "CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.o" "gcc" "CMakeFiles/transparent-node.dir/src/ip-redirector.cpp.o.d"
   )
 
 # Targets to which this target links.

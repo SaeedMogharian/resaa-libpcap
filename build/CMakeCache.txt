@@ -227,6 +227,15 @@ transparent-node_IS_TOP_LEVEL:STATIC=ON
 //Value Computed by CMake
 transparent-node_SOURCE_DIR:STATIC=/root/projects/resaa-transparent-node
 
+//Value Computed by CMake
+transparent_BINARY_DIR:STATIC=/root/projects/resaa-transparent-node/build
+
+//Value Computed by CMake
+transparent_IS_TOP_LEVEL:STATIC=ON
+
+//Value Computed by CMake
+transparent_SOURCE_DIR:STATIC=/root/projects/resaa-transparent-node
+
 
 ########################
 # INTERNAL cache entries
